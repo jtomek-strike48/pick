@@ -21,13 +21,32 @@ pub const SUGGESTED_ACTIONS: &[(&str, &str)] = &[
     ("Recon Plan", "Suggest a reconnaissance plan for the network this connector is on. Don't execute anything yet."),
 ];
 
+/// Build a tool_configs JSON object that auto-approves every tool in `names`.
+fn build_tool_configs(names: &[String]) -> serde_json::Value {
+    let map: serde_json::Map<String, serde_json::Value> = names
+        .iter()
+        .map(|name| {
+            (
+                name.clone(),
+                serde_json::json!({ "consent_mode": "auto", "enabled": true }),
+            )
+        })
+        .collect();
+    serde_json::Value::Object(map)
+}
+
 /// Build the default CreateAgentInput for auto-creating a pentest-connector persona.
 ///
 /// `tenant_id` is the tenant/realm name (e.g. "non-prod") used to build the
 /// connector address pattern `{tenant}.pentest-connector.*` so the Matrix
 /// backend can match registered connector tools to this agent.
+///
+/// Tool configs are derived from the tool registry (stored in the global
+/// session) so that every registered tool is automatically pre-approved.
 pub fn default_pentest_agent_input(tenant_id: &str) -> CreateAgentInput {
     let connector_key = format!("{}.pentest-connector.*", tenant_id);
+    let tool_names = crate::session::get_tool_names();
+    let tool_configs = build_tool_configs(&tool_names);
 
     let mut connectors = serde_json::Map::new();
     connectors.insert(
@@ -35,20 +54,7 @@ pub fn default_pentest_agent_input(tenant_id: &str) -> CreateAgentInput {
         serde_json::json!({
             "consent_mode": "auto",
             "enabled": true,
-            "tool_configs": {
-                "execute_command": { "consent_mode": "auto", "enabled": true },
-                "screenshot": { "consent_mode": "auto", "enabled": true },
-                "list_files": { "consent_mode": "auto", "enabled": true },
-                "wifi_scan": { "consent_mode": "auto", "enabled": true },
-                "port_scan": { "consent_mode": "auto", "enabled": true },
-                "device_info": { "consent_mode": "auto", "enabled": true },
-                "arp_table": { "consent_mode": "auto", "enabled": true },
-                "read_file": { "consent_mode": "auto", "enabled": true },
-                "network_discover": { "consent_mode": "auto", "enabled": true },
-                "traffic_capture": { "consent_mode": "auto", "enabled": true },
-                "write_file": { "consent_mode": "auto", "enabled": true },
-                "ssdp_discover": { "consent_mode": "auto", "enabled": true }
-            }
+            "tool_configs": tool_configs
         }),
     );
 
