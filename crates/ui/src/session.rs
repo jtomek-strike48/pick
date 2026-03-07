@@ -9,6 +9,7 @@ use std::sync::{LazyLock, RwLock};
 
 static AUTH_TOKEN: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new()));
 static TENANT_ID: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new()));
+static TOOL_NAMES: LazyLock<RwLock<Vec<String>>> = LazyLock::new(|| RwLock::new(Vec::new()));
 
 /// Read the current session auth token (Matrix access token for GraphQL).
 pub fn get_auth_token() -> String {
@@ -32,4 +33,15 @@ pub fn set_tenant_id(tenant: &str) {
     let mut guard = TENANT_ID.write().unwrap_or_else(|e| e.into_inner());
     guard.clear();
     guard.push_str(tenant);
+}
+
+/// Read the registered connector tool names.
+pub fn get_tool_names() -> Vec<String> {
+    TOOL_NAMES.read().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// Store the registered connector tool names.
+pub fn set_tool_names(names: Vec<String>) {
+    let mut guard = TOOL_NAMES.write().unwrap_or_else(|e| e.into_inner());
+    *guard = names;
 }

@@ -124,9 +124,10 @@ impl LiveViewConnector {
     pub fn new(config: ConnectorConfig, tools: ToolRegistry) -> Self {
         let (event_tx, _) = broadcast::channel(64);
 
-        // Store tenant_id in the global session so the WorkspaceApp (liveview)
-        // can read it when auto-creating the agent persona.
+        // Store tenant_id and tool names in the global session so the
+        // WorkspaceApp (liveview) can read them when auto-creating the agent persona.
         crate::session::set_tenant_id(&config.tenant_id);
+        crate::session::set_tool_names(tools.names().iter().map(|s| s.to_string()).collect());
 
         // Create workspace directory
         let workspace_path = match workspace::create_workspace(&config.instance_id) {
