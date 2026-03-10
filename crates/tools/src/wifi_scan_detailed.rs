@@ -9,8 +9,7 @@ use async_trait::async_trait;
 use pentest_core::error::{Error, Result};
 use pentest_core::settings::load_settings;
 use pentest_core::tools::{
-    execute_timed, ParamType, PentestTool, Platform, ToolContext, ToolParam, ToolResult,
-    ToolSchema,
+    execute_timed, ParamType, PentestTool, Platform, ToolContext, ToolParam, ToolResult, ToolSchema,
 };
 use pentest_platform::{get_platform, SystemInfo as _, WifiAttackOps};
 use serde_json::{json, Value};
@@ -94,10 +93,13 @@ impl PentestTool for WifiScanDetailedTool {
 
             tracing::info!("");
             tracing::info!("⚡ Step 2/4: Enabling monitor mode on {}...", interface);
-            let mon_interface = match platform.enable_monitor_mode(&interface, allow_network_disruption).await {
-                Ok(iface) => {
+            let (mon_interface, killed_network_manager) = match platform.enable_monitor_mode(&interface, allow_network_disruption).await {
+                Ok((iface, killed_nm)) => {
                     tracing::info!("✓ Monitor mode enabled: {}", iface);
-                    iface
+                    if killed_nm {
+                        tracing::warn!("⚠️  NetworkManager was killed to enable monitor mode");
+                    }
+                    (iface, killed_nm)
                 }
                 Err(e) => {
                     let error_msg = format!("Failed to enable monitor mode: {}", e);
@@ -116,7 +118,7 @@ impl PentestTool for WifiScanDetailedTool {
             let cleanup = async {
                 tracing::info!("");
                 tracing::info!("🧹 Cleaning up and restoring network...");
-                if let Err(e) = platform.disable_monitor_mode(&cleanup_mon_interface).await {
+                if let Err(e) = platform.disable_monitor_mode(&cleanup_mon_interface, killed_network_manager).await {
                     tracing::warn!("Failed to disable monitor mode: {}", e);
                 }
             };
@@ -199,8 +201,10 @@ async fn capture_with_client_detection(
     let child = Command::new("sudo")
         .args([
             "airodump-ng",
-            "--output-format", "csv",
-            "-w", output_file,
+            "--output-format",
+            "csv",
+            "-w",
+            output_file,
             interface,
         ])
         .stdout(Stdio::null())
@@ -213,9 +217,9 @@ async fn capture_with_client_detection(
             ))
         })?;
 
-    let pid = child.id().ok_or_else(|| {
-        Error::ToolExecution("Failed to get airodump-ng PID".into())
-    })?;
+    let pid = child
+        .id()
+        .ok_or_else(|| Error::ToolExecution("Failed to get airodump-ng PID".into()))?;
 
     tracing::info!("  Capture started (PID: {})...", pid);
 
@@ -224,7 +228,11 @@ async fn capture_with_client_detection(
     while elapsed < duration_secs {
         tokio::time::sleep(Duration::from_secs(5)).await;
         elapsed += 5;
-        tracing::info!("  Progress: {}s / {}s", elapsed.min(duration_secs), duration_secs);
+        tracing::info!(
+            "  Progress: {}s / {}s",
+            elapsed.min(duration_secs),
+            duration_secs
+        );
     }
 
     // Stop capture

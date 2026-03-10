@@ -110,16 +110,32 @@ pub trait CommandExec: Send + Sync {
 #[async_trait]
 pub trait WifiAttackOps: Send + Sync {
     /// Enable monitor mode on a WiFi interface
-    /// Returns the monitor interface name (e.g., "wlan0mon")
+    /// Returns (monitor_interface_name, killed_network_manager)
     ///
     /// # Arguments
     /// * `interface` - WiFi interface name (e.g., "wlan0")
     /// * `allow_kill_network_manager` - If true, allows killing NetworkManager to enable monitor mode.
     ///   If false and monitor mode fails, returns an error instead of killing NetworkManager.
-    async fn enable_monitor_mode(&self, interface: &str, allow_kill_network_manager: bool) -> Result<String>;
+    ///
+    /// # Returns
+    /// * `monitor_interface` - Name of the monitor interface (e.g., "wlan0mon")
+    /// * `killed_network_manager` - True if NetworkManager was killed to enable monitor mode
+    async fn enable_monitor_mode(
+        &self,
+        interface: &str,
+        allow_kill_network_manager: bool,
+    ) -> Result<(String, bool)>;
 
     /// Disable monitor mode and restore managed mode
-    async fn disable_monitor_mode(&self, interface: &str) -> Result<()>;
+    ///
+    /// # Arguments
+    /// * `interface` - Monitor interface name (e.g., "wlan0mon")
+    /// * `restart_network_manager` - If true, restarts NetworkManager (only needed if it was killed during enable)
+    async fn disable_monitor_mode(
+        &self,
+        interface: &str,
+        restart_network_manager: bool,
+    ) -> Result<()>;
 
     /// Clone MAC address to appear as another device
     async fn clone_mac(&self, interface: &str, target_mac: &str) -> Result<()>;

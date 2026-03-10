@@ -122,8 +122,8 @@ impl SystemInfo for AndroidPlatform {
         selected_adapter: Option<String>,
     ) -> Result<WifiConnectionStatus> {
         let _ = selected_adapter; // Suppress unused warning
-        // Android doesn't have the same WiFi adapter issues as desktop
-        // Return safe by default
+                                  // Android doesn't have the same WiFi adapter issues as desktop
+                                  // Return safe by default
         Ok(WifiConnectionStatus {
             connected_via_wifi: false,
             active_interface: None,
@@ -175,13 +175,21 @@ impl CommandExec for AndroidPlatform {
 
 #[async_trait]
 impl WifiAttackOps for AndroidPlatform {
-    async fn enable_monitor_mode(&self, _interface: &str, _allow_kill_network_manager: bool) -> Result<String> {
+    async fn enable_monitor_mode(
+        &self,
+        _interface: &str,
+        _allow_kill_network_manager: bool,
+    ) -> Result<(String, bool)> {
         Err(Error::PlatformNotSupported(
             "WiFi attacks not supported on Android without root".into(),
         ))
     }
 
-    async fn disable_monitor_mode(&self, _interface: &str) -> Result<()> {
+    async fn disable_monitor_mode(
+        &self,
+        _interface: &str,
+        _restart_network_manager: bool,
+    ) -> Result<()> {
         Err(Error::PlatformNotSupported(
             "WiFi attacks not supported on Android".into(),
         ))
