@@ -9,6 +9,7 @@ mod constants;
 mod history;
 mod input;
 mod messages;
+mod next_steps;
 mod polling;
 mod render;
 
