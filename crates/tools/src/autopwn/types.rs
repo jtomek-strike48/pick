@@ -31,8 +31,12 @@ impl AttackStrategy {
 
     pub fn estimated_duration(&self) -> Duration {
         let secs = match self {
-            AttackStrategy::Wep { estimated_time_sec, .. } => *estimated_time_sec,
-            AttackStrategy::Wpa { estimated_time_sec, .. } => *estimated_time_sec,
+            AttackStrategy::Wep {
+                estimated_time_sec, ..
+            } => *estimated_time_sec,
+            AttackStrategy::Wpa {
+                estimated_time_sec, ..
+            } => *estimated_time_sec,
             AttackStrategy::Unsupported { .. } => 0,
         };
         Duration::from_secs(secs)
