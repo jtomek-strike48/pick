@@ -11,8 +11,13 @@ use super::DesktopPlatform;
 
 #[async_trait]
 impl WifiAttackOps for DesktopPlatform {
-    async fn enable_monitor_mode(&self, interface: &str, allow_kill_network_manager: bool) -> Result<String> {
+    async fn enable_monitor_mode(
+        &self,
+        interface: &str,
+        allow_kill_network_manager: bool,
+    ) -> Result<(String, bool)> {
         tracing::info!("Enabling monitor mode on {}", interface);
+        let mut killed_network_manager = false;
 
         // Modern airmon-ng can work alongside NetworkManager
         // Only kill interfering processes if explicitly allowed and monitor mode fails first
@@ -23,10 +28,7 @@ impl WifiAttackOps for DesktopPlatform {
             .output()
             .await
             .map_err(|e| {
-                Error::ToolExecution(format!(
-                    "Failed to run airmon-ng (is it installed?): {}",
-                    e
-                ))
+                Error::ToolExecution(format!("Failed to run airmon-ng (is it installed?): {}", e))
             })?;
 
         // If it failed, check if we're allowed to kill NetworkManager
@@ -43,13 +45,17 @@ impl WifiAttackOps for DesktopPlatform {
 
             // User authorized killing NetworkManager
             tracing::warn!("⚠️  Monitor mode failed without killing NetworkManager");
-            tracing::warn!("⚠️  User authorized network disruption - killing interfering processes...");
+            tracing::warn!(
+                "⚠️  User authorized network disruption - killing interfering processes..."
+            );
             tracing::warn!("⚠️  This will temporarily disconnect your internet!");
 
             let _ = Command::new("sudo")
                 .args(["airmon-ng", "check", "kill"])
                 .output()
                 .await;
+
+            killed_network_manager = true;
 
             // Retry monitor mode
             let output = Command::new("sudo")
@@ -76,7 +82,10 @@ impl WifiAttackOps for DesktopPlatform {
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         // Look for pattern like "mon0 mode enabled" or "wlan0mon enabled"
-        let mon_interface = if let Some(line) = stdout.lines().find(|l| l.contains("monitor mode") && l.contains("enabled")) {
+        let mon_interface = if let Some(line) = stdout
+            .lines()
+            .find(|l| l.contains("monitor mode") && l.contains("enabled"))
+        {
             // Try to extract interface name from line
             if let Some(word) = line.split_whitespace().next() {
                 if word.contains("mon") {
@@ -93,10 +102,14 @@ impl WifiAttackOps for DesktopPlatform {
         };
 
         tracing::info!("✓ Monitor mode enabled: {}", mon_interface);
-        Ok(mon_interface)
+        Ok((mon_interface, killed_network_manager))
     }
 
-    async fn disable_monitor_mode(&self, interface: &str) -> Result<()> {
+    async fn disable_monitor_mode(
+        &self,
+        interface: &str,
+        restart_network_manager: bool,
+    ) -> Result<()> {
         tracing::info!("🧹 Disabling monitor mode on {}", interface);
 
         // Stop monitor interface
@@ -111,31 +124,36 @@ impl WifiAttackOps for DesktopPlatform {
             tracing::warn!("Failed to disable monitor mode: {}", stderr);
         }
 
-        // Always restart NetworkManager to ensure network connectivity is restored
-        tracing::info!("🔄 Restarting NetworkManager to restore network connectivity...");
-        let _ = Command::new("sudo")
-            .args(["systemctl", "restart", "NetworkManager"])
-            .output()
-            .await;
+        // Only restart NetworkManager if we killed it during enable_monitor_mode
+        if restart_network_manager {
+            tracing::info!("🔄 Restarting NetworkManager to restore network connectivity...");
+            let _ = Command::new("sudo")
+                .args(["systemctl", "restart", "NetworkManager"])
+                .output()
+                .await;
 
-        // Give NetworkManager time to come back up and reconnect
-        tokio::time::sleep(Duration::from_secs(3)).await;
+            // Give NetworkManager time to come back up and reconnect
+            tokio::time::sleep(Duration::from_secs(3)).await;
 
-        // Check if NetworkManager is running
-        let nm_status = Command::new("systemctl")
-            .args(["is-active", "NetworkManager"])
-            .output()
-            .await;
+            // Check if NetworkManager is running
+            let nm_status = Command::new("systemctl")
+                .args(["is-active", "NetworkManager"])
+                .output()
+                .await;
 
-        if let Ok(status) = nm_status {
-            if status.status.success() {
-                tracing::info!("✓ NetworkManager is running");
-            } else {
-                tracing::warn!("⚠️  NetworkManager may not be running - network connectivity may be limited");
+            if let Ok(status) = nm_status {
+                if status.status.success() {
+                    tracing::info!("✓ NetworkManager is running");
+                } else {
+                    tracing::warn!("⚠️  NetworkManager may not be running - network connectivity may be limited");
+                }
             }
+
+            tracing::info!("✓ Monitor mode disabled, network restored");
+        } else {
+            tracing::info!("✓ Monitor mode disabled, network connectivity preserved (NetworkManager not restarted)");
         }
 
-        tracing::info!("✓ Monitor mode disabled, network restoration attempted");
         Ok(())
     }
 
@@ -155,7 +173,10 @@ impl WifiAttackOps for DesktopPlatform {
             .output()
             .await
             .map_err(|e| {
-                Error::ToolExecution(format!("Failed to run macchanger (is it installed?): {}", e))
+                Error::ToolExecution(format!(
+                    "Failed to run macchanger (is it installed?): {}",
+                    e
+                ))
             })?;
 
         // Bring interface back up
@@ -202,7 +223,11 @@ impl WifiAttackOps for DesktopPlatform {
             if line.contains("/") && line.contains("%") {
                 supported = true;
                 // Try to extract percentage
-                if let Some(pct_str) = line.split('%').next().and_then(|s| s.split_whitespace().last()) {
+                if let Some(pct_str) = line
+                    .split('%')
+                    .next()
+                    .and_then(|s| s.split_whitespace().last())
+                {
                     if let Ok(pct) = pct_str.parse::<f32>() {
                         success_rate = pct / 100.0;
                     }
@@ -333,14 +358,7 @@ impl WifiAttackOps for DesktopPlatform {
         tracing::info!("Performing fake authentication to {}", bssid);
 
         let output = Command::new("sudo")
-            .args([
-                "aireplay-ng",
-                "--fakeauth",
-                "0",
-                "-a",
-                bssid,
-                interface,
-            ])
+            .args(["aireplay-ng", "--fakeauth", "0", "-a", bssid, interface])
             .output()
             .await
             .map_err(|e| Error::ToolExecution(format!("Failed to run fake auth: {}", e)))?;
@@ -361,13 +379,7 @@ impl WifiAttackOps for DesktopPlatform {
         tracing::info!("Starting ARP replay attack on {}", bssid);
 
         let child = Command::new("sudo")
-            .args([
-                "aireplay-ng",
-                "--arpreplay",
-                "-b",
-                bssid,
-                interface,
-            ])
+            .args(["aireplay-ng", "--arpreplay", "-b", bssid, interface])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -410,13 +422,7 @@ impl WifiAttackOps for DesktopPlatform {
         );
 
         let count_str = count.to_string();
-        let mut args = vec![
-            "aireplay-ng",
-            "--deauth",
-            &count_str,
-            "-a",
-            bssid,
-        ];
+        let mut args = vec!["aireplay-ng", "--deauth", &count_str, "-a", bssid];
 
         let client_arg;
         if let Some(c) = client {

@@ -133,7 +133,7 @@ impl PentestTool for AutoPwnCaptureTool {
 
             // Enable monitor mode
             tracing::info!("⚙️  Enabling monitor mode...");
-            let mon_interface = platform
+            let (mon_interface, killed_network_manager) = platform
                 .enable_monitor_mode(&interface, allow_network_disruption)
                 .await
                 .map_err(|e| {
@@ -141,12 +141,15 @@ impl PentestTool for AutoPwnCaptureTool {
                 })?;
 
             tracing::info!("✓ Monitor mode enabled: {}", mon_interface);
+            if killed_network_manager {
+                tracing::warn!("⚠️  NetworkManager was killed to enable monitor mode");
+            }
 
             // Set up cleanup on error or completion
             let cleanup_mon_interface = mon_interface.clone();
             let cleanup = async {
                 tracing::info!("🧹 Cleaning up and restoring network...");
-                if let Err(e) = platform.disable_monitor_mode(&cleanup_mon_interface).await {
+                if let Err(e) = platform.disable_monitor_mode(&cleanup_mon_interface, killed_network_manager).await {
                     tracing::warn!("Failed to disable monitor mode: {}", e);
                 }
             };
@@ -380,12 +383,7 @@ async fn capture_wep(
             0.0
         };
 
-        tracing::info!(
-            "  IVs: {} / {} ({:.0}/sec)",
-            stats.ivs,
-            target_ivs,
-            iv_rate
-        );
+        tracing::info!("  IVs: {} / {} ({:.0}/sec)", stats.ivs, target_ivs, iv_rate);
 
         last_iv_count = stats.ivs;
         last_update = Instant::now();
@@ -406,7 +404,9 @@ async fn capture_wep(
     Ok(CaptureResult {
         success: true,
         capture_file: cap_file,
-        capture_type: CaptureType::WepIvs { count: last_iv_count },
+        capture_type: CaptureType::WepIvs {
+            count: last_iv_count,
+        },
         quality: CaptureQuality::Excellent,
         duration_sec: start.elapsed().as_secs(),
     })
