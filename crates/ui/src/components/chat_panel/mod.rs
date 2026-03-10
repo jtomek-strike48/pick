@@ -17,6 +17,7 @@ use dioxus::prelude::*;
 use pentest_core::matrix::{
     AgentInfo, ChatClient, ChatMessage, ConversationInfo, MatrixChatClient, UpdateAgentInput,
 };
+use pentest_core::terminal::TerminalLine;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -176,16 +177,17 @@ pub fn ChatPanel(props: ChatPanelProps) -> Element {
         });
     }
 
-    // Debug: log credential state on each render when panel is visible
+    // Debug: log credential state to both tracing and the Logs sidebar
     if props.visible && !agents_loaded() {
-        tracing::info!(
-            "[ChatPanel] render: api_url={:?} auth_token_len={} session_token_len={} agents_loaded={} fetch_started={}",
-            if api_url.is_empty() { "(empty)" } else { &api_url },
+        let log_msg = format!(
+            "[chat] waiting for credentials: api_url={} token_len={} session_token_len={} fetch_started={}",
+            if api_url.is_empty() { "(empty)" } else { "(set)" },
             effective_token.len(),
             crate::session::get_auth_token().len(),
-            agents_loaded(),
             fetch_started(),
         );
+        tracing::info!("{}", log_msg);
+        crate::liveview_server::push_terminal_line(TerminalLine::info(log_msg));
     }
 
     // -----------------------------------------------------------------------
@@ -194,14 +196,18 @@ pub fn ChatPanel(props: ChatPanelProps) -> Element {
 
     if !effective_token.is_empty() && !api_url.is_empty() && !agents_loaded() && !fetch_started() {
         fetch_started.set(true);
-        tracing::info!("ChatPanel: fetch_started set to true (will not retry)");
         let client = make_client();
         let tenant_id = props.tenant_id.clone();
-        tracing::info!("ChatPanel: fetching agents from {}", api_url);
+        let log_url = api_url.clone();
+        crate::liveview_server::push_terminal_line(TerminalLine::info(
+            format!("[chat] fetching agents from {}", api_url),
+        ));
         spawn(async move {
             match client.list_agents().await {
                 Ok(mut list) => {
-                    tracing::info!("ChatPanel: loaded {} agents", list.len());
+                    crate::liveview_server::push_terminal_line(TerminalLine::success(
+                        format!("[chat] loaded {} agents from {}", list.len(), log_url),
+                    ));
                     let auto = list
                         .iter()
                         .find(|a| a.name.to_lowercase().contains(PENTEST_AGENT_NAME))
@@ -264,19 +270,15 @@ pub fn ChatPanel(props: ChatPanelProps) -> Element {
                 }
                 Err(e) => {
                     let err_str = e.to_string();
-                    // Log the token prefix for debugging (first 20 chars)
                     let session_tok = crate::session::get_auth_token();
-                    let tok_preview = if session_tok.len() > 20 {
-                        format!("{}...", &session_tok[..20])
-                    } else {
-                        session_tok.clone()
-                    };
                     tracing::error!(
-                        "ChatPanel: failed to fetch agents: {} (token_len={} preview={:?})",
+                        "ChatPanel: failed to fetch agents: {} (token_len={})",
                         err_str,
                         session_tok.len(),
-                        tok_preview,
                     );
+                    crate::liveview_server::push_terminal_line(TerminalLine::error(
+                        format!("[chat] failed to fetch agents: {}", err_str),
+                    ));
 
                     let is_auth_err = err_str.contains("authenticated")
                         || err_str.contains("authorized")
