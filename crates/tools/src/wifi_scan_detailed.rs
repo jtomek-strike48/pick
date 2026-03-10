@@ -94,8 +94,22 @@ impl PentestTool for WifiScanDetailedTool {
 
             tracing::info!("");
             tracing::info!("⚡ Step 2/4: Enabling monitor mode on {}...", interface);
-            let mon_interface = platform.enable_monitor_mode(&interface, allow_network_disruption).await?;
-            tracing::info!("✓ Monitor mode enabled: {}", mon_interface);
+            let mon_interface = match platform.enable_monitor_mode(&interface, allow_network_disruption).await {
+                Ok(iface) => {
+                    tracing::info!("✓ Monitor mode enabled: {}", iface);
+                    iface
+                }
+                Err(e) => {
+                    let error_msg = format!("Failed to enable monitor mode: {}", e);
+                    tracing::error!("{}", error_msg);
+                    if !allow_network_disruption {
+                        tracing::info!("");
+                        tracing::info!("💡 Tip: Your adapter may require network disruption to enable monitor mode.");
+                        tracing::info!("   Try: wifi_scan_detailed(allow_network_disruption=true)");
+                    }
+                    return Err(Error::ToolExecution(error_msg));
+                }
+            };
 
             // Set up cleanup
             let cleanup_mon_interface = mon_interface.clone();
@@ -226,6 +240,18 @@ async fn capture_with_client_detection(
     // Parse CSV file
     let csv_file = format!("{}-01.csv", output_file);
     tracing::info!("  Parsing results from {}...", csv_file);
+
+    // Check if CSV file exists
+    if !std::path::Path::new(&csv_file).exists() {
+        tracing::warn!("CSV file not found: {}", csv_file);
+        tracing::warn!("airodump-ng may have failed to create output file");
+        tracing::warn!("Possible reasons:");
+        tracing::warn!("  - Monitor mode not enabled properly");
+        tracing::warn!("  - No packets captured during scan");
+        tracing::warn!("  - Permission issues");
+        // Return empty client counts rather than failing
+        return Ok(HashMap::new());
+    }
 
     parse_airodump_csv(&csv_file).await
 }
