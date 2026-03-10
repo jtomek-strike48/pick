@@ -130,33 +130,30 @@ impl PentestTool for AutoPwnCrackTool {
             // Execute crack based on security type and method
             match sec_type {
                 SecurityType::Wep => crack_wep(capture_file, bssid).await,
-                SecurityType::Wpa | SecurityType::Wpa2 => {
-                    match method {
-                        "quick" => crack_wpa_quick(capture_file, bssid, timeout_secs).await,
-                        "dictionary" => {
-                            crack_wpa_dictionary(capture_file, bssid, wordlist_name, timeout_secs)
-                                .await
-                        }
-                        "mask" => {
-                            let pattern = mask.ok_or_else(|| {
-                                Error::InvalidParams("mask parameter required for mask attack".into())
-                            })?;
-                            crack_wpa_mask(capture_file, bssid, pattern, timeout_secs).await
-                        }
-                        "remote" => {
-                            let endpoint = remote_endpoint.ok_or_else(|| {
-                                Error::InvalidParams(
-                                    "remote_endpoint parameter required for remote cracking".into(),
-                                )
-                            })?;
-                            crack_wpa_remote(capture_file, bssid, ssid, endpoint).await
-                        }
-                        _ => Err(Error::InvalidParams(format!(
-                            "Unknown crack method: {}",
-                            method
-                        ))),
+                SecurityType::Wpa | SecurityType::Wpa2 => match method {
+                    "quick" => crack_wpa_quick(capture_file, bssid, timeout_secs).await,
+                    "dictionary" => {
+                        crack_wpa_dictionary(capture_file, bssid, wordlist_name, timeout_secs).await
                     }
-                }
+                    "mask" => {
+                        let pattern = mask.ok_or_else(|| {
+                            Error::InvalidParams("mask parameter required for mask attack".into())
+                        })?;
+                        crack_wpa_mask(capture_file, bssid, pattern, timeout_secs).await
+                    }
+                    "remote" => {
+                        let endpoint = remote_endpoint.ok_or_else(|| {
+                            Error::InvalidParams(
+                                "remote_endpoint parameter required for remote cracking".into(),
+                            )
+                        })?;
+                        crack_wpa_remote(capture_file, bssid, ssid, endpoint).await
+                    }
+                    _ => Err(Error::InvalidParams(format!(
+                        "Unknown crack method: {}",
+                        method
+                    ))),
+                },
                 _ => Err(Error::InvalidParams(format!(
                     "{} security not supported for cracking",
                     sec_type.as_str()
@@ -234,7 +231,11 @@ async fn crack_wep(capture_file: &str, bssid: &str) -> Result<CrackResult> {
 }
 
 /// Quick WPA crack (try common passwords first)
-async fn crack_wpa_quick(capture_file: &str, bssid: &str, timeout_secs: u64) -> Result<CrackResult> {
+async fn crack_wpa_quick(
+    capture_file: &str,
+    bssid: &str,
+    timeout_secs: u64,
+) -> Result<CrackResult> {
     tracing::info!("");
     tracing::info!("🎯 WPA Quick Crack (Common Passwords)");
     tracing::info!("───────────────────────────────────────────────────");
@@ -348,18 +349,12 @@ async fn crack_with_wordlist(
     let output = match result {
         Ok(Ok(output)) => output,
         Ok(Err(e)) => {
-            return Err(Error::ToolExecution(format!(
-                "aircrack-ng failed: {}",
-                e
-            )));
+            return Err(Error::ToolExecution(format!("aircrack-ng failed: {}", e)));
         }
         Err(_) => {
             // Timeout - kill process
             if let Some(pid) = child_id {
-                let _ = Command::new("kill")
-                    .arg(pid.to_string())
-                    .output()
-                    .await;
+                let _ = Command::new("kill").arg(pid.to_string()).output().await;
             }
             tracing::warn!("⏱ Timeout reached ({}s)", timeout_secs);
 
@@ -428,16 +423,11 @@ async fn crack_wpa_mask(
     tracing::info!("");
 
     // Check if hashcat is available
-    let hashcat_check = Command::new("which")
-        .arg("hashcat")
-        .output()
-        .await
-        .ok();
+    let hashcat_check = Command::new("which").arg("hashcat").output().await.ok();
 
     if hashcat_check.is_none() || !hashcat_check.unwrap().status.success() {
         return Err(Error::ToolExecution(
-            "Mask attacks require hashcat (not installed). Use 'dictionary' method instead."
-                .into(),
+            "Mask attacks require hashcat (not installed). Use 'dictionary' method instead.".into(),
         ));
     }
 
@@ -475,7 +465,10 @@ async fn crack_wpa_remote(
         .await
         .map_err(|e| Error::ToolExecution(format!("Failed to read capture file: {}", e)))?;
 
-    tracing::info!("📤 Uploading handshake ({} KB)...", capture_data.len() / 1024);
+    tracing::info!(
+        "📤 Uploading handshake ({} KB)...",
+        capture_data.len() / 1024
+    );
 
     // Send to remote service
     let client = reqwest::Client::builder()

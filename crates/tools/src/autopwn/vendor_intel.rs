@@ -109,8 +109,8 @@ pub fn get_mask_patterns(ssid: &str) -> Vec<&'static str> {
     } else {
         // Generic patterns for unknown vendors
         vec![
-            "?d?d?d?d?d?d?d?d", // 8 digits
-            "?l?l?l?l?l?l?l?l", // 8 lowercase
+            "?d?d?d?d?d?d?d?d",     // 8 digits
+            "?l?l?l?l?l?l?l?l",     // 8 lowercase
             "?u?l?l?l?l?l?l?d?d?d", // Common word+number format
         ]
     }
