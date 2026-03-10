@@ -27,10 +27,7 @@ pub fn select_strategy(
     // Check signal strength
     if signal < -85 {
         return Ok(AttackStrategy::Unsupported {
-            reason: format!(
-                "Signal too weak ({} dBm) - move closer to target",
-                signal
-            ),
+            reason: format!("Signal too weak ({} dBm) - move closer to target", signal),
         });
     }
 
@@ -141,19 +138,18 @@ fn select_wpa_strategy(ssid: &str, _bssid: &str, signal: i32, clients: u32) -> A
 #[allow(dead_code)]
 pub fn estimate_duration(strategy: &AttackStrategy) -> u64 {
     match strategy {
-        AttackStrategy::Wep { estimated_time_sec, .. } => *estimated_time_sec,
-        AttackStrategy::Wpa { estimated_time_sec, .. } => *estimated_time_sec,
+        AttackStrategy::Wep {
+            estimated_time_sec, ..
+        } => *estimated_time_sec,
+        AttackStrategy::Wpa {
+            estimated_time_sec, ..
+        } => *estimated_time_sec,
         AttackStrategy::Unsupported { .. } => 0,
     }
 }
 
 /// Calculate attack feasibility score (0.0-1.0)
-pub fn calculate_feasibility(
-    security: &str,
-    signal: i32,
-    clients: u32,
-    is_default: bool,
-) -> f32 {
+pub fn calculate_feasibility(security: &str, signal: i32, clients: u32, is_default: bool) -> f32 {
     let sec_type = SecurityType::parse(security);
 
     if !sec_type.is_attackable() {
@@ -164,9 +160,9 @@ pub fn calculate_feasibility(
 
     // Security type factor
     score += match sec_type {
-        SecurityType::Wep => 0.4,        // WEP is easy
-        SecurityType::Wpa => 0.25,       // WPA is harder
-        SecurityType::Wpa2 => 0.2,       // WPA2 is hardest
+        SecurityType::Wep => 0.4,  // WEP is easy
+        SecurityType::Wpa => 0.25, // WPA is harder
+        SecurityType::Wpa2 => 0.2, // WPA2 is hardest
         _ => 0.0,
     };
 
@@ -216,7 +212,12 @@ mod tests {
         let strategy = select_strategy("TestNet", "00:11:22:33:44:55", "WPA2-PSK", -55, 3).unwrap();
         assert!(strategy.is_supported());
 
-        if let AttackStrategy::Wpa { capture_mode, confidence, .. } = strategy {
+        if let AttackStrategy::Wpa {
+            capture_mode,
+            confidence,
+            ..
+        } = strategy
+        {
             assert!(matches!(capture_mode, CaptureMode::ActiveDeauth { .. }));
             assert!(confidence > 0.7); // Should have high confidence with clients
         } else {
@@ -237,7 +238,8 @@ mod tests {
 
     #[test]
     fn test_default_ssid_uses_mask() {
-        let strategy = select_strategy("NETGEAR42", "00:11:22:33:44:55", "WPA2-PSK", -55, 2).unwrap();
+        let strategy =
+            select_strategy("NETGEAR42", "00:11:22:33:44:55", "WPA2-PSK", -55, 2).unwrap();
 
         if let AttackStrategy::Wpa { crack_method, .. } = strategy {
             assert!(matches!(crack_method, CrackMethod::MaskAttack { .. }));

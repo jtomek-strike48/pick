@@ -223,7 +223,11 @@ async fn scan_specific_interface(interface: &str) -> Result<Vec<WifiNetwork>> {
 
             // Start new network
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            current_bssid = parts.get(1).unwrap_or(&"").trim_end_matches('(').to_string();
+            current_bssid = parts
+                .get(1)
+                .unwrap_or(&"")
+                .trim_end_matches('(')
+                .to_string();
             current_ssid = String::new();
             current_signal = 0;
             current_channel = 0;

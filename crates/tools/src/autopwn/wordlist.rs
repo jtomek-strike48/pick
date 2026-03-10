@@ -121,7 +121,8 @@ pub async fn download_wordlist(wordlist: &Wordlist) -> Result<PathBuf> {
         if total_size > 0 {
             let progress = (downloaded * 100 / total_size) as u32;
             if progress >= last_progress + 10 {
-                tracing::info!("   {}% complete ({} MB / {} MB)",
+                tracing::info!(
+                    "   {}% complete ({} MB / {} MB)",
                     progress,
                     downloaded / 1_000_000,
                     total_size / 1_000_000
