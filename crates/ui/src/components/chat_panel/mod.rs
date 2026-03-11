@@ -440,13 +440,15 @@ pub fn ChatPanel(props: ChatPanelProps) -> Element {
                 };
                 messages.write().push(user_msg);
                 user_scrolled_up.set(false);
-                if let Err(e) = document::eval("resetScrollFlag('.chat-messages')").await {
-                    tracing::warn!("JS eval failed (reset scroll flag): {e}");
-                }
 
-                if let Err(e) = document::eval("clearTextarea('.chat-input')").await {
-                    tracing::warn!("JS eval failed (clear input): {e}");
-                }
+                // Fire-and-forget: don't await these UI polish evals before
+                // the API call. On Windows WebView2 in LiveView mode,
+                // document::eval responses can hang indefinitely, which
+                // would block send_message from ever executing.
+                spawn(async move {
+                    let _ = document::eval("resetScrollFlag('.chat-messages')").await;
+                    let _ = document::eval("clearTextarea('.chat-input')").await;
+                });
 
                 match client.send_message(&conv_id, &agent.id, &text).await {
                     Ok(_) => {
