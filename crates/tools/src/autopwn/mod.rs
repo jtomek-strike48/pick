@@ -8,6 +8,7 @@
 mod capture;
 mod crack;
 mod network_plan;
+mod orchestrator;
 mod strategy;
 mod types;
 mod vendor_intel;
@@ -16,6 +17,7 @@ mod wordlist;
 pub use capture::AutoPwnCaptureTool;
 pub use crack::AutoPwnCrackTool;
 pub use network_plan::AutoPwnNetworkPlanTool;
+pub use orchestrator::AutoPwnOrchestratorTool;
 pub use types::*;
 
 use async_trait::async_trait;

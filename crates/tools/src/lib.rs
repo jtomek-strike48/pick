@@ -26,7 +26,10 @@ pub mod write_file;
 use pentest_core::tools::ToolRegistry;
 
 pub use arp_table::ArpTableTool;
-pub use autopwn::{AutoPwnCaptureTool, AutoPwnCrackTool, AutoPwnNetworkPlanTool, AutoPwnPlanTool};
+pub use autopwn::{
+    AutoPwnCaptureTool, AutoPwnCrackTool, AutoPwnNetworkPlanTool, AutoPwnOrchestratorTool,
+    AutoPwnPlanTool,
+};
 pub use cve_lookup::CveLookupTool;
 pub use default_creds::DefaultCredsTool;
 pub use device_info::DeviceInfoTool;
@@ -64,6 +67,9 @@ pub fn create_tool_registry() -> ToolRegistry {
 
     // Network autopwn (fallback when WiFi pentest unavailable)
     registry.register(AutoPwnNetworkPlanTool);
+
+    // Intelligent autopwn orchestrator (detects hardware and chooses strategy)
+    registry.register(AutoPwnOrchestratorTool);
 
     // Vulnerability assessment
     registry.register(ServiceBannerTool);
