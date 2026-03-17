@@ -36,6 +36,9 @@ pub mod assetfinder;
 pub mod gospider;
 pub mod katana;
 pub mod paramspider;
+pub mod dalfox;
+pub mod joomscan;
+pub mod droopescan;
 
 pub use hakrawler::HakrawlerTool;
 pub use httprobe::HttpprobeTool;
@@ -47,3 +50,6 @@ pub use assetfinder::AssetfinderTool;
 pub use gospider::GospiderTool;
 pub use katana::KatanaTool;
 pub use paramspider::ParamspiderTool;
+pub use dalfox::DalfoxTool;
+pub use joomscan::JoomscanTool;
+pub use droopescan::DroopescanTool;
