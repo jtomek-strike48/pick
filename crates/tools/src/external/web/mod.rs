@@ -39,6 +39,8 @@ pub mod paramspider;
 pub mod dalfox;
 pub mod joomscan;
 pub mod droopescan;
+pub mod whatweb;
+pub mod wafw00f;
 
 pub use hakrawler::HakrawlerTool;
 pub use httprobe::HttpprobeTool;
@@ -53,3 +55,5 @@ pub use paramspider::ParamspiderTool;
 pub use dalfox::DalfoxTool;
 pub use joomscan::JoomscanTool;
 pub use droopescan::DroopescanTool;
+pub use whatweb::WhatwebTool;
+pub use wafw00f::Wafw00fTool;

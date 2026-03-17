@@ -13,6 +13,7 @@ pub mod arp_scan;
 pub mod nbtscan;
 pub mod hping3;
 pub mod arping;
+pub mod unicornscan;
 
 pub use tshark::TsharkTool;
 pub use netdiscover::NetdiscoverTool;
@@ -22,3 +23,4 @@ pub use arp_scan::ArpScanTool;
 pub use nbtscan::NbtscanTool;
 pub use hping3::Hping3Tool;
 pub use arping::ArpingTool;
+pub use unicornscan::UnicornscanTool;
