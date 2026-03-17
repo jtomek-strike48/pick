@@ -134,6 +134,10 @@ impl PentestTool for WebAppToolchain {
             // Create a fresh registry with all tools for the engine
             let registry = Arc::new(crate::create_tool_registry());
 
+            tracing::info!("");
+            tracing::info!("🔧 Registry contains {} tools", registry.names().len());
+            eprintln!("\n🔧 Registry contains {} tools", registry.names().len());
+
             // Create engine
             let engine = ToolchainEngine::new(
                 session,
@@ -141,8 +145,14 @@ impl PentestTool for WebAppToolchain {
                 ctx.clone(),
             );
 
+            tracing::info!("🚀 Executing playbook...");
+            eprintln!("🚀 Executing playbook with {} phases...", playbook.phases.len());
+
             // Execute playbook
             let report = engine.execute_playbook(&playbook, &target).await?;
+
+            tracing::info!("📝 Report generated");
+            eprintln!("📝 Report generated: {} tools executed\n", report.get("tools_executed").and_then(|v| v.as_u64()).unwrap_or(0));
 
             // Display summary
             if let Some(findings) = report.get("findings") {
