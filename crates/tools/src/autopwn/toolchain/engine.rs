@@ -180,9 +180,12 @@ impl ToolchainEngine {
 
     /// Execute a single step
     async fn execute_step(&self, step: &Step, target: &str) -> Result<()> {
+        eprintln!("  [execute_step] Tool: {}, Target: {}", step.tool, target);
+
         // Check condition
         if !self.should_execute_step(step).await {
             tracing::info!("    ⊘ Skipping {}: condition not met", step.tool);
+            eprintln!("    ⊘ Skipped: condition not met");
             let mut execution = ToolExecution::new(
                 step.tool.clone(),
                 target.to_string(),
@@ -225,6 +228,7 @@ impl ToolchainEngine {
         }
 
         tracing::info!("    ▶ Executing: {}", step.tool);
+        eprintln!("    ▶ Executing: {}", step.tool);
 
         // Create execution record
         let phase = self.session.lock().await.current_phase.clone();
@@ -249,6 +253,8 @@ impl ToolchainEngine {
                             step.tool,
                             duration_ms
                         );
+                        eprintln!("      ✓ {} completed in {}ms", step.tool, duration_ms);
+                        eprintln!("         Result: {}", serde_json::to_string(&result.data).unwrap_or_default().chars().take(200).collect::<String>());
 
                         // Extract findings if available
                         self.extract_findings(&step.tool, target, &result.data).await;
@@ -262,6 +268,7 @@ impl ToolchainEngine {
                         execution.fail(error_msg.clone(), duration_ms);
 
                         tracing::error!("      ✗ {} failed: {}", step.tool, error_msg);
+                        eprintln!("      ✗ {} failed: {}", step.tool, error_msg);
 
                         self.session.lock().await.record_execution(execution);
 
