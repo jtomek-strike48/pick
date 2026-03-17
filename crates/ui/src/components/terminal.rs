@@ -4,23 +4,11 @@ use dioxus::prelude::*;
 use pentest_core::terminal::{LogLevel, TerminalLine};
 
 /// Terminal output component
+///
+/// Note: Lines are displayed in reverse order (newest first) by the LogFilterBar,
+/// so no auto-scroll to bottom is needed - newest logs appear at the top.
 #[component]
 pub fn Terminal(lines: Vec<TerminalLine>) -> Element {
-    let mut line_count = use_signal(|| 0usize);
-
-    if lines.len() != *line_count.read() {
-        line_count.set(lines.len());
-    }
-
-    use_effect(move || {
-        let _count = *line_count.read();
-        spawn(async move {
-            if let Err(e) = document::eval("scrollToBottom('#terminal-output')").await {
-                tracing::warn!("JS eval failed (terminal scroll): {e}");
-            }
-        });
-    });
-
     rsx! {
         div { class: "terminal",
             id: "terminal-output",
