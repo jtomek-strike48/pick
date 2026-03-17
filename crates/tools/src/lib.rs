@@ -41,10 +41,11 @@ pub use external::{
     HttpprobeTool, HydraTool, ImpacketGetuserspnsTool, ImpacketPsexecTool,
     ImpacketSecretsdumpTool, ImpacketWmiexecTool, JohnTool, JoomscanTool, KatanaTool,
     LdapsearchTool, LinpeasTool, MasscanFastTool, MasscanTool, NbtscanTool, NcatTool,
-    NetdiscoverTool, NiktoTool, NmapTool, NmapVulnTool, NucleiTool, OnesixtyoneTool,
-    ParamspiderTool, ResponderTool, RustScanTool, SearchsploitTool, SmbmapTool, SnmpwalkTool,
-    SocatTool, SqlmapTool, SslscanTool, SubfinderTool, Sublist3rTool, TestsslTool,
-    TheHarvesterTool, TsharkTool, WaybackurlsTool, WfuzzTool, WhoisTool, WpscanTool, XsstrikeTool,
+    NetdiscoverTool, NiktoNgTool, NiktoTool, NmapTool, NmapVulnTool, NucleiTool, OnesixtyoneTool,
+    ParamspiderTool, ReconNgTool, ResponderTool, RustScanTool, SearchsploitTool, SkipfishTool,
+    SmbmapTool, SnmpwalkTool, SocatTool, SpiderfootTool, SqlmapTool, SslscanTool, SubfinderTool,
+    Sublist3rTool, TestsslTool, TheHarvesterTool, TsharkTool, UnicornscanTool, Wafw00fTool,
+    WaybackurlsTool, WfuzzTool, WhatwebTool, WhoisTool, WpscanTool, XsstrikeTool,
 }; // External tools
 pub use list_files::ListFilesTool;
 pub use network_discover::NetworkDiscoverTool;
@@ -118,6 +119,8 @@ pub fn create_tool_registry() -> ToolRegistry {
     registry.register(DalfoxTool); // XSS scanner
     registry.register(JoomscanTool); // Joomla scanner
     registry.register(DroopescanTool); // CMS scanner
+    registry.register(WhatwebTool); // Technology identifier
+    registry.register(Wafw00fTool); // WAF detector
 
     // Credential attacks (External tools)
     registry.register(HydraTool); // Login bruteforcer (50+ protocols)
@@ -143,6 +146,7 @@ pub fn create_tool_registry() -> ToolRegistry {
     registry.register(NbtscanTool); // NetBIOS scanner
     registry.register(Hping3Tool); // Packet assembler
     registry.register(ArpingTool); // ARP ping
+    registry.register(UnicornscanTool); // Network stimulus tool
 
     // Forensics
     registry.register(ExiftoolTool); // Metadata extraction
@@ -171,6 +175,10 @@ pub fn create_tool_registry() -> ToolRegistry {
     registry.register(OnesixtyoneTool); // SNMP scanner
     registry.register(ChangemeTool); // Default credential scanner
     registry.register(EyewitnessTool); // Screenshot tool
+    registry.register(NiktoNgTool); // Web scanner (extended)
+    registry.register(SkipfishTool); // Active web recon
+    registry.register(ReconNgTool); // Recon framework
+    registry.register(SpiderfootTool); // Automated OSINT
 
     // Device and system info
     registry.register(DeviceInfoTool);

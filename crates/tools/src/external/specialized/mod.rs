@@ -20,6 +20,10 @@ pub mod snmpwalk;
 pub mod onesixtyone;
 pub mod changeme;
 pub mod eyewitness;
+pub mod nikto_ng;
+pub mod skipfish;
+pub mod recon_ng;
+pub mod spiderfoot;
 
 pub use hashcat::HashcatTool;
 pub use searchsploit::SearchsploitTool;
@@ -41,3 +45,7 @@ pub use snmpwalk::SnmpwalkTool;
 pub use onesixtyone::OnesixtyoneTool;
 pub use changeme::ChangemeTool;
 pub use eyewitness::EyewitnessTool;
+pub use nikto_ng::NiktoNgTool;
+pub use skipfish::SkipfishTool;
+pub use recon_ng::ReconNgTool;
+pub use spiderfoot::SpiderfootTool;
