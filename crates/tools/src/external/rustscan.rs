@@ -152,7 +152,7 @@ fn parse_rustscan_output(stdout: &str, target: &str) -> Result<Value> {
         // RustScan outputs: "Open 10.10.2.169:22"
         // or "-> 22" format
         if line.starts_with("Open") {
-            if let Some(port_str) = line.split(':').last() {
+            if let Some(port_str) = line.split(':').next_back() {
                 if let Ok(port) = port_str.trim().parse::<u16>() {
                     open_ports.push(json!({
                         "port": port,
