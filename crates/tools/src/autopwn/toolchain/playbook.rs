@@ -5,19 +5,14 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 /// Condition for executing a step
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum StepCondition {
     /// Always execute
+    #[default]
     Always,
     /// Execute if expression evaluates to true (simple key-value checks)
     Expression(String),
-}
-
-impl Default for StepCondition {
-    fn default() -> Self {
-        StepCondition::Always
-    }
 }
 
 /// A single step in a toolchain
@@ -57,19 +52,14 @@ pub struct Step {
 }
 
 /// Risk level for a step
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum RiskLevel {
+    #[default]
     Low,
     Medium,
     High,
     Critical,
-}
-
-impl Default for RiskLevel {
-    fn default() -> Self {
-        RiskLevel::Low
-    }
 }
 
 /// A phase in the attack workflow
