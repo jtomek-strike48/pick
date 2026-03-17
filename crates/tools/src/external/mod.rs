@@ -55,7 +55,8 @@ pub use web::{
     AmassTool, ArjunTool, AssetfinderTool, CommixTool, DalfoxTool, DirsearchTool,
     DroopescanTool, FeroxbusterTool, FfufDnsTool, GauTool, GospiderTool, HakrawlerTool,
     HttpprobeTool, JoomscanTool, KatanaTool, NucleiTool, ParamspiderTool, SqlmapTool,
-    SubfinderTool, Sublist3rTool, WaybackurlsTool, WfuzzTool, WpscanTool, XsstrikeTool,
+    SubfinderTool, Sublist3rTool, Wafw00fTool, WaybackurlsTool, WfuzzTool, WhatwebTool,
+    WpscanTool, XsstrikeTool,
 };
 
 // Phase 4 - Post-Exploitation
@@ -68,12 +69,12 @@ pub use postexploit::{
 pub use forensics::ExiftoolTool;
 pub use network::{
     ArpingTool, ArpScanTool, BettercapTool, Hping3Tool, MasscanFastTool, NbtscanTool,
-    NetdiscoverTool, NmapVulnTool, ResponderTool, TsharkTool,
+    NetdiscoverTool, NmapVulnTool, ResponderTool, TsharkTool, UnicornscanTool,
 };
 pub use specialized::{
     CewlTool, ChangemeTool, CrunchTool, DnsenumTool, DnsreconTool, Enum4linuxNgTool,
-    EyewitnessTool, FierceTool, HashcatTool, LdapsearchTool, NcatTool, OnesixtyoneTool,
-    SearchsploitTool, SmbmapTool, SnmpwalkTool, SocatTool, SslscanTool, TestsslTool,
-    TheHarvesterTool, WhoisTool,
+    EyewitnessTool, FierceTool, HashcatTool, LdapsearchTool, NcatTool, NiktoNgTool,
+    OnesixtyoneTool, ReconNgTool, SearchsploitTool, SkipfishTool, SmbmapTool, SnmpwalkTool,
+    SocatTool, SpiderfootTool, SslscanTool, TestsslTool, TheHarvesterTool, WhoisTool,
 };
 pub use wireless::AircrackngTool;
