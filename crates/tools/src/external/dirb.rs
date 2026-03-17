@@ -191,7 +191,7 @@ fn parse_dirb_output(output: &str, url: &str) -> Result<Value> {
         if line.starts_with('+') {
             if let Some(url_part) = line
                 .strip_prefix('+')
-                .and_then(|s| s.trim().split_whitespace().next())
+                .and_then(|s| s.split_whitespace().next())
             {
                 // Extract status code and size
                 let status_code = if let Some(code_str) = line.split("CODE:").nth(1) {
