@@ -241,7 +241,7 @@ fn parse_host_xml(xml: &str) -> Value {
 
     // Extract hostname
     let hostname = extract_xml_attribute(xml, r#"<hostname\s+name="([^"]+)""#)
-        .unwrap_or_else(|| "".to_string());
+        .unwrap_or_default();
 
     // Extract state (up/down)
     let state = extract_xml_attribute(xml, r#"<status\s+state="([^"]+)""#)
@@ -264,9 +264,9 @@ fn parse_host_xml(xml: &str) -> Value {
         // Only include open ports
         if port_state == "open" {
             let service = extract_xml_attribute(port_xml, r#"<service\s+name="([^"]+)""#)
-                .unwrap_or_else(|| "".to_string());
+                .unwrap_or_default();
             let version = extract_xml_attribute(port_xml, r#"<service\s+[^>]*product="([^"]+)""#)
-                .unwrap_or_else(|| "".to_string());
+                .unwrap_or_default();
 
             ports.push(json!({
                 "protocol": protocol,
