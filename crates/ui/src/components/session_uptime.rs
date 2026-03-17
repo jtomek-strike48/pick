@@ -29,7 +29,7 @@ fn format_uptime(duration: Duration) -> String {
 #[component]
 pub fn SessionUptime() -> Element {
     // Store the session start time
-    let start_time = use_signal(|| SystemTime::now());
+    let start_time = use_signal(SystemTime::now);
 
     // Current uptime display string (updated every second)
     let mut uptime_display = use_signal(|| String::from("0s"));

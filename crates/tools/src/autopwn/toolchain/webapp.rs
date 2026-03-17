@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 /// Web Application Automated Toolchain
+#[derive(Default)]
 pub struct WebAppToolchain;
 
 impl WebAppToolchain {
@@ -78,7 +79,7 @@ impl PentestTool for WebAppToolchain {
             let session_id = params["session_id"]
                 .as_str()
                 .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| "webapp")
+                .unwrap_or("webapp")
                 .to_string();
 
             // Parse execution mode
