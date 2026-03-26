@@ -1,11 +1,129 @@
 //! Theme definitions for the pentest connector UI
 //!
-//! Provides oklch color tokens with automatic light/dark mode via
-//! `prefers-color-scheme`. Token names follow the shadcn/ui convention
-//! used by strike48/ui.
+//! Provides oklch color tokens with WinAMP-style theme support.
+//! Token names follow the shadcn/ui convention used by strike48/ui.
 
-/// CSS custom properties (oklch color tokens) with `prefers-color-scheme`
-/// light/dark mode support plus base component styles.
+use pentest_core::config::{BorderRadius, Density, Theme};
+
+/// Generate CSS custom properties based on theme, border radius, and density settings.
+/// Supports WinAMP-style instant theme switching.
+pub fn generate_theme_css(theme: Theme, radius: BorderRadius, density: Density) -> String {
+    let colors = get_theme_colors(theme);
+    let radius_value = get_radius_value(radius);
+    let spacing = get_density_spacing(density);
+
+    format!(
+        r#"
+        :root {{
+            /* Theme: {:?} */
+            color-scheme: {};
+
+            /* Color tokens */
+            --background: {};
+            --foreground: {};
+            --card: {};
+            --popover: {};
+            --primary: {};
+            --primary-foreground: {};
+            --secondary: {};
+            --secondary-foreground: {};
+            --muted: {};
+            --muted-foreground: {};
+            --accent: {};
+            --accent-foreground: {};
+            --destructive: {};
+            --border: {};
+            --input: {};
+            --ring: {};
+
+            /* Shape tokens */
+            --radius: {};
+            --radius-sm: calc(var(--radius) - 4px);
+            --radius-md: calc(var(--radius) - 2px);
+            --radius-lg: var(--radius);
+            --radius-xl: calc(var(--radius) + 4px);
+
+            /* Spacing tokens (density) */
+            --spacing-xs: {};
+            --spacing-sm: {};
+            --spacing-md: {};
+            --spacing-lg: {};
+            --spacing-xl: {};
+
+            /* Sidebar tokens */
+            --sidebar: {};
+            --sidebar-foreground: {};
+            --sidebar-primary: {};
+            --sidebar-primary-foreground: {};
+            --sidebar-accent: {};
+            --sidebar-accent-foreground: {};
+            --sidebar-border: {};
+            --sidebar-ring: {};
+
+            /* Chart tokens */
+            --chart-1: {};
+            --chart-2: {};
+            --chart-3: {};
+            --chart-4: {};
+            --chart-5: {};
+
+            /* Extended tokens */
+            --success: {};
+            --warning: {};
+            --info: {};
+
+            /* Typography tokens */
+            --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+            --font-heading: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+            --font-mono: "Cascadia Code", "Fira Code", "Consolas", "Courier New", monospace;
+            --font-size: {}px;
+        }}
+        "#,
+        theme,
+        colors.color_scheme,
+        colors.background,
+        colors.foreground,
+        colors.card,
+        colors.popover,
+        colors.primary,
+        colors.primary_foreground,
+        colors.secondary,
+        colors.secondary_foreground,
+        colors.muted,
+        colors.muted_foreground,
+        colors.accent,
+        colors.accent_foreground,
+        colors.destructive,
+        colors.border,
+        colors.input,
+        colors.ring,
+        radius_value,
+        spacing.xs,
+        spacing.sm,
+        spacing.md,
+        spacing.lg,
+        spacing.xl,
+        colors.sidebar,
+        colors.sidebar_foreground,
+        colors.sidebar_primary,
+        colors.sidebar_primary_foreground,
+        colors.sidebar_accent,
+        colors.sidebar_accent_foreground,
+        colors.sidebar_border,
+        colors.sidebar_ring,
+        colors.chart_1,
+        colors.chart_2,
+        colors.chart_3,
+        colors.chart_4,
+        colors.chart_5,
+        colors.success,
+        colors.warning,
+        colors.info,
+        spacing.font_size,
+    ) + BASE_COMPONENT_STYLES
+}
+
+/// Legacy function for backwards compatibility - uses Dark theme defaults
 pub fn theme_css() -> &'static str {
     r#"
         :root {
@@ -365,3 +483,649 @@ pub fn mobile_css() -> &'static str {
 pub fn tailwind_css() -> &'static str {
     include_str!("styles/tailwind-out.css")
 }
+
+// ============================================================================
+// Theme System - WinAMP-style Theming
+// ============================================================================
+
+#[derive(Debug, Clone)]
+struct ThemeColors {
+    color_scheme: &'static str,
+    background: &'static str,
+    foreground: &'static str,
+    card: &'static str,
+    popover: &'static str,
+    primary: &'static str,
+    primary_foreground: &'static str,
+    secondary: &'static str,
+    secondary_foreground: &'static str,
+    muted: &'static str,
+    muted_foreground: &'static str,
+    accent: &'static str,
+    accent_foreground: &'static str,
+    destructive: &'static str,
+    border: &'static str,
+    input: &'static str,
+    ring: &'static str,
+    sidebar: &'static str,
+    sidebar_foreground: &'static str,
+    sidebar_primary: &'static str,
+    sidebar_primary_foreground: &'static str,
+    sidebar_accent: &'static str,
+    sidebar_accent_foreground: &'static str,
+    sidebar_border: &'static str,
+    sidebar_ring: &'static str,
+    chart_1: &'static str,
+    chart_2: &'static str,
+    chart_3: &'static str,
+    chart_4: &'static str,
+    chart_5: &'static str,
+    success: &'static str,
+    warning: &'static str,
+    info: &'static str,
+}
+
+#[derive(Debug, Clone)]
+struct DensitySpacing {
+    xs: &'static str,
+    sm: &'static str,
+    md: &'static str,
+    lg: &'static str,
+    xl: &'static str,
+    font_size: u32,
+}
+
+fn get_theme_colors(theme: Theme) -> ThemeColors {
+    match theme {
+        Theme::Dark => dark_theme(),
+        Theme::Light => light_theme(),
+        Theme::Rust => rust_theme(),
+        Theme::Chrome => chrome_theme(),
+        Theme::Rainbow => rainbow_theme(),
+        Theme::Matrix => matrix_theme(),
+        Theme::Cyberpunk => cyberpunk_theme(),
+        Theme::Nord => nord_theme(),
+    }
+}
+
+fn get_radius_value(radius: BorderRadius) -> &'static str {
+    match radius {
+        BorderRadius::Sharp => "0px",
+        BorderRadius::Minimal => "4px",
+        BorderRadius::Rounded => "8px",
+        BorderRadius::Soft => "16px",
+        BorderRadius::Pill => "999px",
+    }
+}
+
+fn get_density_spacing(density: Density) -> DensitySpacing {
+    match density {
+        Density::Compact => DensitySpacing {
+            xs: "2px",
+            sm: "4px",
+            md: "8px",
+            lg: "12px",
+            xl: "16px",
+            font_size: 12,
+        },
+        Density::Normal => DensitySpacing {
+            xs: "4px",
+            sm: "8px",
+            md: "12px",
+            lg: "16px",
+            xl: "24px",
+            font_size: 14,
+        },
+        Density::Comfortable => DensitySpacing {
+            xs: "6px",
+            sm: "12px",
+            md: "16px",
+            lg: "24px",
+            xl: "32px",
+            font_size: 16,
+        },
+    }
+}
+
+// Theme Color Palettes
+
+fn dark_theme() -> ThemeColors {
+    ThemeColors {
+        color_scheme: "dark",
+        background: "oklch(0.145 0 0)",
+        foreground: "oklch(0.985 0 0)",
+        card: "oklch(0.145 0 0)",
+        popover: "oklch(0.145 0 0)",
+        primary: "oklch(0.985 0 0)",
+        primary_foreground: "oklch(0.205 0 0)",
+        secondary: "oklch(0.269 0 0)",
+        secondary_foreground: "oklch(0.985 0 0)",
+        muted: "oklch(0.269 0 0)",
+        muted_foreground: "oklch(0.708 0 0)",
+        accent: "oklch(0.269 0 0)",
+        accent_foreground: "oklch(0.985 0 0)",
+        destructive: "oklch(0.5058 0.2066 27.85)",
+        border: "oklch(0.269 0 0)",
+        input: "oklch(0.269 0 0)",
+        ring: "oklch(0.439 0 0)",
+        sidebar: "oklch(0.205 0 0)",
+        sidebar_foreground: "oklch(0.985 0 0)",
+        sidebar_primary: "oklch(0.488 0.243 264.376)",
+        sidebar_primary_foreground: "oklch(0.985 0 0)",
+        sidebar_accent: "oklch(0.269 0 0)",
+        sidebar_accent_foreground: "oklch(0.985 0 0)",
+        sidebar_border: "oklch(0.269 0 0)",
+        sidebar_ring: "oklch(0.439 0 0)",
+        chart_1: "oklch(0.488 0.243 264.376)",
+        chart_2: "oklch(0.696 0.17 162.48)",
+        chart_3: "oklch(0.769 0.188 70.08)",
+        chart_4: "oklch(0.627 0.265 303.9)",
+        chart_5: "oklch(0.645 0.246 16.439)",
+        success: "oklch(0.75 0.18 145)",
+        warning: "oklch(0.85 0.13 85)",
+        info: "oklch(0.7 0.15 250)",
+    }
+}
+
+fn light_theme() -> ThemeColors {
+    ThemeColors {
+        color_scheme: "light",
+        background: "oklch(1 0 0)",
+        foreground: "oklch(0.145 0 0)",
+        card: "oklch(1 0 0)",
+        popover: "oklch(1 0 0)",
+        primary: "oklch(0.205 0 0)",
+        primary_foreground: "oklch(0.985 0 0)",
+        secondary: "oklch(0.97 0 0)",
+        secondary_foreground: "oklch(0.205 0 0)",
+        muted: "oklch(0.97 0 0)",
+        muted_foreground: "oklch(0.556 0 0)",
+        accent: "oklch(0.97 0 0)",
+        accent_foreground: "oklch(0.205 0 0)",
+        destructive: "oklch(0.5757 0.2352 27.92)",
+        border: "oklch(0.922 0 0)",
+        input: "oklch(0.922 0 0)",
+        ring: "oklch(0.708 0 0)",
+        sidebar: "oklch(0.985 0 0)",
+        sidebar_foreground: "oklch(0.145 0 0)",
+        sidebar_primary: "oklch(0.205 0 0)",
+        sidebar_primary_foreground: "oklch(0.985 0 0)",
+        sidebar_accent: "oklch(0.97 0 0)",
+        sidebar_accent_foreground: "oklch(0.205 0 0)",
+        sidebar_border: "oklch(0.922 0 0)",
+        sidebar_ring: "oklch(0.708 0 0)",
+        chart_1: "oklch(0.646 0.222 41.116)",
+        chart_2: "oklch(0.6 0.118 184.704)",
+        chart_3: "oklch(0.398 0.07 227.392)",
+        chart_4: "oklch(0.828 0.189 84.429)",
+        chart_5: "oklch(0.769 0.188 70.08)",
+        success: "oklch(0.55 0.18 145)",
+        warning: "oklch(0.75 0.15 85)",
+        info: "oklch(0.6 0.15 250)",
+    }
+}
+
+fn rust_theme() -> ThemeColors {
+    ThemeColors {
+        color_scheme: "dark",
+        background: "oklch(0.15 0.05 40)",      // Deep brown
+        foreground: "oklch(0.95 0.02 40)",      // Warm off-white
+        card: "oklch(0.18 0.05 40)",
+        popover: "oklch(0.18 0.05 40)",
+        primary: "oklch(0.65 0.2 40)",          // Rust orange
+        primary_foreground: "oklch(0.95 0.02 40)",
+        secondary: "oklch(0.25 0.08 40)",       // Burnt orange
+        secondary_foreground: "oklch(0.95 0.02 40)",
+        muted: "oklch(0.30 0.05 40)",
+        muted_foreground: "oklch(0.70 0.05 40)",
+        accent: "oklch(0.55 0.18 35)",          // Copper
+        accent_foreground: "oklch(0.95 0.02 40)",
+        destructive: "oklch(0.50 0.20 25)",
+        border: "oklch(0.30 0.05 40)",
+        input: "oklch(0.20 0.05 40)",
+        ring: "oklch(0.50 0.15 40)",
+        sidebar: "oklch(0.12 0.05 40)",
+        sidebar_foreground: "oklch(0.95 0.02 40)",
+        sidebar_primary: "oklch(0.65 0.2 40)",
+        sidebar_primary_foreground: "oklch(0.95 0.02 40)",
+        sidebar_accent: "oklch(0.25 0.08 40)",
+        sidebar_accent_foreground: "oklch(0.95 0.02 40)",
+        sidebar_border: "oklch(0.25 0.05 40)",
+        sidebar_ring: "oklch(0.50 0.15 40)",
+        chart_1: "oklch(0.65 0.2 40)",
+        chart_2: "oklch(0.60 0.18 50)",
+        chart_3: "oklch(0.70 0.15 30)",
+        chart_4: "oklch(0.55 0.18 35)",
+        chart_5: "oklch(0.60 0.16 45)",
+        success: "oklch(0.70 0.15 140)",
+        warning: "oklch(0.75 0.18 70)",
+        info: "oklch(0.65 0.12 240)",
+    }
+}
+
+fn chrome_theme() -> ThemeColors {
+    ThemeColors {
+        color_scheme: "dark",
+        background: "oklch(0.20 0.02 240)",     // Charcoal
+        foreground: "oklch(0.95 0.01 240)",     // Cool white
+        card: "oklch(0.24 0.02 240)",
+        popover: "oklch(0.24 0.02 240)",
+        primary: "oklch(0.60 0.15 240)",        // Chrome blue
+        primary_foreground: "oklch(0.95 0.01 240)",
+        secondary: "oklch(0.35 0.03 240)",      // Steel gray
+        secondary_foreground: "oklch(0.95 0.01 240)",
+        muted: "oklch(0.40 0.02 240)",
+        muted_foreground: "oklch(0.70 0.02 240)",
+        accent: "oklch(0.55 0.12 220)",         // Silver blue
+        accent_foreground: "oklch(0.95 0.01 240)",
+        destructive: "oklch(0.50 0.20 25)",
+        border: "oklch(0.35 0.02 240)",
+        input: "oklch(0.25 0.02 240)",
+        ring: "oklch(0.50 0.10 240)",
+        sidebar: "oklch(0.18 0.02 240)",
+        sidebar_foreground: "oklch(0.95 0.01 240)",
+        sidebar_primary: "oklch(0.60 0.15 240)",
+        sidebar_primary_foreground: "oklch(0.95 0.01 240)",
+        sidebar_accent: "oklch(0.35 0.03 240)",
+        sidebar_accent_foreground: "oklch(0.95 0.01 240)",
+        sidebar_border: "oklch(0.30 0.02 240)",
+        sidebar_ring: "oklch(0.50 0.10 240)",
+        chart_1: "oklch(0.60 0.15 240)",
+        chart_2: "oklch(0.65 0.12 220)",
+        chart_3: "oklch(0.55 0.18 260)",
+        chart_4: "oklch(0.58 0.14 200)",
+        chart_5: "oklch(0.62 0.16 250)",
+        success: "oklch(0.70 0.15 160)",
+        warning: "oklch(0.75 0.15 80)",
+        info: "oklch(0.65 0.15 240)",
+    }
+}
+
+fn rainbow_theme() -> ThemeColors {
+    ThemeColors {
+        color_scheme: "dark",
+        background: "oklch(0.15 0.10 300)",     // Deep purple
+        foreground: "oklch(0.98 0.02 300)",     // Pure white
+        card: "oklch(0.18 0.12 300)",
+        popover: "oklch(0.18 0.12 300)",
+        primary: "oklch(0.70 0.30 330)",        // Vibrant magenta
+        primary_foreground: "oklch(0.98 0.02 300)",
+        secondary: "oklch(0.65 0.28 280)",      // Purple
+        secondary_foreground: "oklch(0.98 0.02 300)",
+        muted: "oklch(0.35 0.15 300)",
+        muted_foreground: "oklch(0.75 0.10 300)",
+        accent: "oklch(0.70 0.30 180)",         // Cyan
+        accent_foreground: "oklch(0.98 0.02 300)",
+        destructive: "oklch(0.55 0.30 25)",
+        border: "oklch(0.35 0.15 300)",
+        input: "oklch(0.22 0.12 300)",
+        ring: "oklch(0.60 0.25 330)",
+        sidebar: "oklch(0.12 0.12 300)",
+        sidebar_foreground: "oklch(0.98 0.02 300)",
+        sidebar_primary: "oklch(0.70 0.30 330)",
+        sidebar_primary_foreground: "oklch(0.98 0.02 300)",
+        sidebar_accent: "oklch(0.65 0.28 280)",
+        sidebar_accent_foreground: "oklch(0.98 0.02 300)",
+        sidebar_border: "oklch(0.30 0.15 300)",
+        sidebar_ring: "oklch(0.60 0.25 330)",
+        chart_1: "oklch(0.70 0.30 0)",          // Red
+        chart_2: "oklch(0.75 0.28 120)",        // Green
+        chart_3: "oklch(0.70 0.30 240)",        // Blue
+        chart_4: "oklch(0.75 0.28 60)",         // Yellow
+        chart_5: "oklch(0.70 0.30 180)",        // Cyan
+        success: "oklch(0.75 0.25 150)",
+        warning: "oklch(0.80 0.25 80)",
+        info: "oklch(0.70 0.25 240)",
+    }
+}
+
+fn matrix_theme() -> ThemeColors {
+    ThemeColors {
+        color_scheme: "dark",
+        background: "oklch(0.05 0 0)",          // Pure black
+        foreground: "oklch(0.70 0.30 150)",     // Matrix green
+        card: "oklch(0.08 0 0)",
+        popover: "oklch(0.08 0 0)",
+        primary: "oklch(0.70 0.30 150)",        // Phosphor green
+        primary_foreground: "oklch(0.05 0 0)",
+        secondary: "oklch(0.15 0.10 150)",      // Dark green
+        secondary_foreground: "oklch(0.70 0.30 150)",
+        muted: "oklch(0.20 0.10 150)",
+        muted_foreground: "oklch(0.50 0.20 150)",
+        accent: "oklch(0.75 0.35 140)",         // Lime
+        accent_foreground: "oklch(0.05 0 0)",
+        destructive: "oklch(0.50 0.25 25)",
+        border: "oklch(0.20 0.10 150)",
+        input: "oklch(0.10 0 0)",
+        ring: "oklch(0.60 0.25 150)",
+        sidebar: "oklch(0.03 0 0)",
+        sidebar_foreground: "oklch(0.70 0.30 150)",
+        sidebar_primary: "oklch(0.70 0.30 150)",
+        sidebar_primary_foreground: "oklch(0.05 0 0)",
+        sidebar_accent: "oklch(0.15 0.10 150)",
+        sidebar_accent_foreground: "oklch(0.70 0.30 150)",
+        sidebar_border: "oklch(0.15 0.10 150)",
+        sidebar_ring: "oklch(0.60 0.25 150)",
+        chart_1: "oklch(0.70 0.30 150)",
+        chart_2: "oklch(0.75 0.35 140)",
+        chart_3: "oklch(0.65 0.25 160)",
+        chart_4: "oklch(0.68 0.28 145)",
+        chart_5: "oklch(0.72 0.32 155)",
+        success: "oklch(0.70 0.30 150)",
+        warning: "oklch(0.75 0.30 90)",
+        info: "oklch(0.65 0.25 170)",
+    }
+}
+
+fn cyberpunk_theme() -> ThemeColors {
+    ThemeColors {
+        color_scheme: "dark",
+        background: "oklch(0.10 0.05 300)",     // Near-black with purple
+        foreground: "oklch(0.95 0.08 330)",     // Bright pink-tinted white
+        card: "oklch(0.13 0.08 300)",
+        popover: "oklch(0.13 0.08 300)",
+        primary: "oklch(0.70 0.35 340)",        // Neon pink
+        primary_foreground: "oklch(0.10 0.05 300)",
+        secondary: "oklch(0.65 0.30 200)",      // Electric cyan
+        secondary_foreground: "oklch(0.95 0.08 330)",
+        muted: "oklch(0.30 0.15 300)",
+        muted_foreground: "oklch(0.70 0.15 330)",
+        accent: "oklch(0.75 0.35 180)",         // Bright cyan
+        accent_foreground: "oklch(0.10 0.05 300)",
+        destructive: "oklch(0.55 0.35 25)",
+        border: "oklch(0.30 0.15 300)",
+        input: "oklch(0.15 0.08 300)",
+        ring: "oklch(0.65 0.30 340)",
+        sidebar: "oklch(0.08 0.05 300)",
+        sidebar_foreground: "oklch(0.95 0.08 330)",
+        sidebar_primary: "oklch(0.70 0.35 340)",
+        sidebar_primary_foreground: "oklch(0.10 0.05 300)",
+        sidebar_accent: "oklch(0.65 0.30 200)",
+        sidebar_accent_foreground: "oklch(0.95 0.08 330)",
+        sidebar_border: "oklch(0.25 0.15 300)",
+        sidebar_ring: "oklch(0.65 0.30 340)",
+        chart_1: "oklch(0.70 0.35 340)",        // Pink
+        chart_2: "oklch(0.75 0.35 180)",        // Cyan
+        chart_3: "oklch(0.68 0.32 280)",        // Purple
+        chart_4: "oklch(0.72 0.30 200)",        // Blue
+        chart_5: "oklch(0.70 0.33 320)",        // Magenta
+        success: "oklch(0.70 0.30 160)",
+        warning: "oklch(0.75 0.30 80)",
+        info: "oklch(0.70 0.30 240)",
+    }
+}
+
+fn nord_theme() -> ThemeColors {
+    ThemeColors {
+        color_scheme: "dark",
+        background: "oklch(0.25 0.02 220)",     // Nord dark
+        foreground: "oklch(0.88 0.01 220)",     // Nord snow
+        card: "oklch(0.28 0.02 220)",
+        popover: "oklch(0.28 0.02 220)",
+        primary: "oklch(0.68 0.10 220)",        // Nord blue
+        primary_foreground: "oklch(0.88 0.01 220)",
+        secondary: "oklch(0.38 0.03 220)",      // Nord darker
+        secondary_foreground: "oklch(0.88 0.01 220)",
+        muted: "oklch(0.42 0.02 220)",
+        muted_foreground: "oklch(0.72 0.02 220)",
+        accent: "oklch(0.72 0.12 200)",         // Frost blue
+        accent_foreground: "oklch(0.88 0.01 220)",
+        destructive: "oklch(0.55 0.18 15)",
+        border: "oklch(0.38 0.02 220)",
+        input: "oklch(0.30 0.02 220)",
+        ring: "oklch(0.60 0.08 220)",
+        sidebar: "oklch(0.22 0.02 220)",
+        sidebar_foreground: "oklch(0.88 0.01 220)",
+        sidebar_primary: "oklch(0.68 0.10 220)",
+        sidebar_primary_foreground: "oklch(0.88 0.01 220)",
+        sidebar_accent: "oklch(0.38 0.03 220)",
+        sidebar_accent_foreground: "oklch(0.88 0.01 220)",
+        sidebar_border: "oklch(0.35 0.02 220)",
+        sidebar_ring: "oklch(0.60 0.08 220)",
+        chart_1: "oklch(0.68 0.10 220)",        // Frost blue
+        chart_2: "oklch(0.72 0.12 200)",        // Frost light blue
+        chart_3: "oklch(0.70 0.15 180)",        // Frost cyan
+        chart_4: "oklch(0.75 0.10 160)",        // Aurora green
+        chart_5: "oklch(0.72 0.12 80)",         // Aurora yellow
+        success: "oklch(0.70 0.15 160)",
+        warning: "oklch(0.75 0.15 75)",
+        info: "oklch(0.68 0.10 220)",
+    }
+}
+
+const BASE_COMPONENT_STYLES: &str = r#"
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-mono);
+            font-size: var(--font-size);
+            background-color: var(--background);
+            color: var(--foreground);
+            line-height: 1.5;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 12px 16px;
+            background-color: var(--secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 16px;
+            gap: 16px;
+        }
+
+        .terminal {
+            flex: 1;
+            background-color: var(--secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 8px 12px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            scroll-behavior: smooth;
+            line-height: 1.5;
+        }
+
+        .terminal-line {
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding: 2px 0;
+            margin: 1px 0;
+        }
+
+        .terminal-line-header.expandable {
+            cursor: pointer;
+        }
+
+        .terminal-line-header.expandable:hover {
+            background-color: color-mix(in srgb, var(--foreground) 5%, transparent);
+        }
+
+        .terminal-details {
+            margin: 2px 0 4px 20px;
+            padding: 6px 10px;
+            background-color: color-mix(in srgb, var(--background) 70%, black);
+            border-left: 2px solid var(--border);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            font-size: 12px;
+            color: var(--muted-foreground);
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .terminal-line.debug { color: var(--muted-foreground); }
+        .terminal-line.info { color: var(--info); }
+        .terminal-line.success { color: var(--success); }
+        .terminal-line.warning { color: var(--warning); }
+        .terminal-line.error { color: var(--destructive); }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.disconnected { background-color: var(--destructive); }
+        .status-dot.connecting { background-color: var(--warning); }
+        .status-dot.connected { background-color: var(--success); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .input-group label {
+            font-size: 12px;
+            color: var(--muted-foreground);
+        }
+
+        input, select {
+            background-color: var(--background);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: var(--spacing-sm) var(--spacing-md);
+            color: var(--foreground);
+            font-family: var(--font-mono);
+            font-size: var(--font-size);
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        input[type="password"] {
+            letter-spacing: 2px;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: var(--primary-foreground);
+            border: none;
+            border-radius: var(--radius);
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-family: var(--font-mono);
+            font-size: var(--font-size);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--ring);
+        }
+
+        button:disabled {
+            background-color: var(--muted-foreground);
+            cursor: not-allowed;
+        }
+
+        button.danger {
+            background-color: var(--destructive);
+        }
+
+        button.danger:hover {
+            background-color: color-mix(in srgb, var(--destructive) 80%, black);
+        }
+
+        button.success {
+            background-color: var(--success);
+        }
+
+        button.success:hover {
+            background-color: color-mix(in srgb, var(--success) 80%, black);
+        }
+
+        .config-form {
+            background-color: var(--secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: var(--spacing-md);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .config-form .form-row {
+            display: flex;
+            gap: var(--spacing-md);
+        }
+
+        .config-form .input-group {
+            flex: 1;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background-color: var(--border);
+            border-radius: calc(var(--radius) / 2);
+            overflow: hidden;
+        }
+
+        .progress-bar .fill {
+            height: 100%;
+            background-color: var(--primary);
+            transition: width 0.2s;
+        }
+
+        .scan-results {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .scan-result {
+            display: flex;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-xs) 0;
+        }
+
+        .scan-result.open { color: var(--success); }
+        .scan-result.closed { color: var(--muted-foreground); }
+
+        .header h1 {
+            font-size: 16px;
+        }
+        "#;

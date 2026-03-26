@@ -1,11 +1,11 @@
-//! Settings page — Connection, Downloads, and Shell Mode controls
+//! Settings page — Connection, Downloads, Shell Mode, and Appearance controls
 //! with form change tracking (original/discard pattern).
 
 use dioxus::prelude::*;
-use pentest_core::config::ShellMode;
+use pentest_core::config::{BorderRadius, Density, ShellMode, Theme};
 use pentest_platform::WifiConnectionStatus;
 
-use super::icons::{Download, Settings, Wifi};
+use super::icons::{Download, Palette, Settings, Wifi};
 use crate::platform_helper;
 
 #[component]
@@ -22,6 +22,13 @@ pub fn SettingsPage(
     on_shell_mode_change: EventHandler<ShellMode>,
     #[props(default)] wifi_adapter: Option<String>,
     #[props(default)] on_wifi_adapter_change: EventHandler<Option<String>>,
+    // Appearance settings
+    theme: Theme,
+    on_theme_change: EventHandler<Theme>,
+    border_radius: BorderRadius,
+    on_border_radius_change: EventHandler<BorderRadius>,
+    density: Density,
+    on_density_change: EventHandler<Density>,
 ) -> Element {
     // -----------------------------------------------------------------------
     // Auto-save on toggle with visual feedback
@@ -157,6 +164,97 @@ pub fn SettingsPage(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Appearance card
+            div { class: "settings-card dashboard-card",
+                div { class: "settings-card-header",
+                    span { class: "settings-card-icon", Palette { size: 16 } }
+                    h2 { "Appearance" }
+                }
+                div { class: "settings-card-body",
+                    // Theme selector
+                    div { class: "input-group",
+                        label { "Theme" }
+                        select {
+                            value: "{theme:?}",
+                            onchange: move |e| {
+                                let theme_str = e.value();
+                                let new_theme = match theme_str.as_str() {
+                                    "Dark" => Theme::Dark,
+                                    "Light" => Theme::Light,
+                                    "Rust" => Theme::Rust,
+                                    "Chrome" => Theme::Chrome,
+                                    "Rainbow" => Theme::Rainbow,
+                                    "Matrix" => Theme::Matrix,
+                                    "Cyberpunk" => Theme::Cyberpunk,
+                                    "Nord" => Theme::Nord,
+                                    _ => Theme::Dark,
+                                };
+                                on_theme_change.call(new_theme);
+                            },
+                            option { value: "Dark", "Dark" }
+                            option { value: "Light", "Light" }
+                            option { value: "Rust", "Rust 🦀" }
+                            option { value: "Chrome", "Chrome 🔷" }
+                            option { value: "Rainbow", "Rainbow 🌈" }
+                            option { value: "Matrix", "Matrix 💚" }
+                            option { value: "Cyberpunk", "Cyberpunk 💜" }
+                            option { value: "Nord", "Nord ❄️" }
+                        }
+                    }
+
+                    // Border radius selector
+                    div { class: "input-group",
+                        label { "Border Radius" }
+                        select {
+                            value: "{border_radius:?}",
+                            onchange: move |e| {
+                                let radius_str = e.value();
+                                let new_radius = match radius_str.as_str() {
+                                    "Sharp" => BorderRadius::Sharp,
+                                    "Minimal" => BorderRadius::Minimal,
+                                    "Rounded" => BorderRadius::Rounded,
+                                    "Soft" => BorderRadius::Soft,
+                                    "Pill" => BorderRadius::Pill,
+                                    _ => BorderRadius::Rounded,
+                                };
+                                on_border_radius_change.call(new_radius);
+                            },
+                            option { value: "Sharp", "Sharp (0px)" }
+                            option { value: "Minimal", "Minimal (4px)" }
+                            option { value: "Rounded", "Rounded (8px)" }
+                            option { value: "Soft", "Soft (16px)" }
+                            option { value: "Pill", "Pill (999px)" }
+                        }
+                    }
+
+                    // Density selector
+                    div { class: "input-group",
+                        label { "Density" }
+                        select {
+                            value: "{density:?}",
+                            onchange: move |e| {
+                                let density_str = e.value();
+                                let new_density = match density_str.as_str() {
+                                    "Compact" => Density::Compact,
+                                    "Normal" => Density::Normal,
+                                    "Comfortable" => Density::Comfortable,
+                                    _ => Density::Normal,
+                                };
+                                on_density_change.call(new_density);
+                            },
+                            option { value: "Compact", "Compact" }
+                            option { value: "Normal", "Normal" }
+                            option { value: "Comfortable", "Comfortable" }
+                        }
+                    }
+
+                    // Info text
+                    div { class: "text-dim-xs", style: "margin-top: 8px;",
+                        "Theme changes apply instantly"
                     }
                 }
             }
