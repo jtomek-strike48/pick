@@ -25,7 +25,7 @@ use super::tools_page::ToolsPage;
 use super::WifiWarningDialog;
 use crate::liveview_server::{get_terminal_lines, get_workspace_path, terminal_lines_count};
 use crate::theme::{responsive_css, tailwind_css, theme_css, utils_css};
-use pentest_core::config::ShellMode;
+use pentest_core::config::{BorderRadius, Density, ShellMode, Theme};
 use pentest_core::settings::{load_settings, save_settings};
 use pentest_core::terminal::TerminalLine;
 
@@ -77,6 +77,18 @@ pub struct WorkspacePagesProps {
     /// Callback to show WiFi warning dialog at top level (status, action_message).
     #[props(default)]
     on_wifi_warning: EventHandler<(pentest_platform::WifiConnectionStatus, String)>,
+    /// Current theme for appearance settings.
+    theme: Theme,
+    /// Callback when the user changes the theme.
+    on_theme_change: EventHandler<Theme>,
+    /// Current border radius for appearance settings.
+    border_radius: BorderRadius,
+    /// Callback when the user changes the border radius.
+    on_border_radius_change: EventHandler<BorderRadius>,
+    /// Current density for appearance settings.
+    density: Density,
+    /// Callback when the user changes the density.
+    on_density_change: EventHandler<Density>,
 }
 
 /// Routes between Dashboard, Tools, Files, Shell, Logs, and Settings.
@@ -187,6 +199,12 @@ pub fn WorkspacePages(props: WorkspacePagesProps) -> Element {
                     on_shell_mode_change: move |mode: ShellMode| props.on_shell_mode_change.call(mode),
                     wifi_adapter: props.wifi_adapter.clone(),
                     on_wifi_adapter_change: move |adapter: Option<String>| props.on_wifi_adapter_change.call(adapter),
+                    theme: props.theme,
+                    on_theme_change: move |t: Theme| props.on_theme_change.call(t),
+                    border_radius: props.border_radius,
+                    on_border_radius_change: move |r: BorderRadius| props.on_border_radius_change.call(r),
+                    density: props.density,
+                    on_density_change: move |d: Density| props.on_density_change.call(d),
                 }
             }
         }
@@ -233,6 +251,12 @@ pub fn WorkspaceApp() -> Element {
         let _ = save_settings(&s);
         s
     });
+
+    // theme state from settings
+    let mut theme = use_signal(move || settings.peek().theme);
+    let mut border_radius = use_signal(move || settings.peek().border_radius);
+    let mut density = use_signal(move || settings.peek().density);
+
     let mut download_progress: Signal<Option<f64>> =
         use_signal(crate::download_manager::get_download_progress);
     let mut blackarch_downloaded = use_signal(crate::download_manager::is_blackarch_ready);
@@ -488,6 +512,27 @@ pub fn WorkspaceApp() -> Element {
                         wifi_warning_status.set(Some(status));
                         wifi_warning_action.set(Some(action));
                         wifi_warning_visible.set(true);
+                    },
+                    theme: *theme.read(),
+                    on_theme_change: move |t: Theme| {
+                        let mut s = settings.write();
+                        s.theme = t;
+                        let _ = save_settings(&s);
+                        theme.set(t);
+                    },
+                    border_radius: *border_radius.read(),
+                    on_border_radius_change: move |r: BorderRadius| {
+                        let mut s = settings.write();
+                        s.border_radius = r;
+                        let _ = save_settings(&s);
+                        border_radius.set(r);
+                    },
+                    density: *density.read(),
+                    on_density_change: move |d: Density| {
+                        let mut s = settings.write();
+                        s.density = d;
+                        let _ = save_settings(&s);
+                        density.set(d);
                     },
                 }
             }
