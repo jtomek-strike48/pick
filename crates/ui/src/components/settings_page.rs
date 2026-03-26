@@ -333,8 +333,8 @@ pub fn SettingsPage(
                         // Show import status
                         if let Some(status) = theme_import_status() {
                             match status {
-                                Ok(msg) => div { class: "text-success-xs", style: "margin-top: 4px;", "{msg}" },
-                                Err(err) => div { class: "text-error-xs", style: "margin-top: 4px; white-space: pre-wrap;", "{err}" },
+                                Ok(ref msg) => rsx! { div { class: "text-success-xs", style: "margin-top: 4px;", "{msg}" } },
+                                Err(ref err) => rsx! { div { class: "text-error-xs", style: "margin-top: 4px; white-space: pre-wrap;", "{err}" } },
                             }
                         }
 
