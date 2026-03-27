@@ -288,6 +288,9 @@ pub fn WorkspaceApp() -> Element {
     // help modal state
     let mut help_visible = use_signal(|| false);
 
+    // Matrix rain overlay state (triggered by Konami code)
+    let mut matrix_rain_visible = use_signal(|| false);
+
     // WiFi warning dialog state — rendered at top level so it overlays everything
     let mut wifi_warning_visible = use_signal(|| false);
     let mut wifi_warning_status = use_signal(|| None::<pentest_platform::WifiConnectionStatus>);
@@ -358,13 +361,14 @@ pub fn WorkspaceApp() -> Element {
     let density_val = *density.read();
 
     let combined_css = format!(
-        "{}\n{}\n{}\n{}\n{}\n{}",
+        "{}\n{}\n{}\n{}\n{}\n{}\n{}",
         crate::theme::generate_theme_css(theme_val, radius_val, density_val),
         responsive_css(),
         utils_css(),
         tailwind_css(),
         crate::view_transitions::theme_transitions_css(),
-        crate::components::toast_css()
+        crate::components::toast_css(),
+        crate::components::matrix_rain_css()
     );
 
     let page = *active_page.read();
@@ -410,10 +414,14 @@ pub fn WorkspaceApp() -> Element {
 
         KonamiCodeWrapper {
             on_konami: move |_| {
+                // Switch to Matrix theme immediately
                 let mut s = settings.write();
                 s.theme = Theme::Matrix;
                 let _ = save_settings(&s);
                 theme.set(Theme::Matrix);
+
+                // Show Matrix rain overlay
+                matrix_rain_visible.set(true);
             },
 
             KeyboardShortcuts {
@@ -590,6 +598,14 @@ pub fn WorkspaceApp() -> Element {
                     wifi_warning_action.set(None);
                 },
             }
+        }
+
+        // Matrix rain overlay — triggered by Konami code
+        MatrixRainOverlay {
+            visible: matrix_rain_visible(),
+            on_dismiss: move |_| {
+                matrix_rain_visible.set(false);
+            },
         }
     }
 }
