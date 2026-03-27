@@ -79,7 +79,7 @@ pub fn SettingsPage(
     let wifi_adapter_changed = local_wifi_adapter() != original_wifi_adapter;
 
     // Theme import state
-    let mut theme_import_path = use_signal(|| String::new());
+    let mut theme_import_path = use_signal(String::new);
     let mut theme_import_status = use_signal(|| None::<Result<String, String>>);
     let mut theme_importing = use_signal(|| false);
     let mut advanced_expanded = use_signal(|| false);

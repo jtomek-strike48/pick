@@ -29,8 +29,8 @@ pub struct KonamiCodeWrapperProps {
 /// Wrapper component that detects Konami code and triggers callback
 #[component]
 pub fn KonamiCodeWrapper(props: KonamiCodeWrapperProps) -> Element {
-    let mut sequence = use_signal(|| Vec::<String>::new());
-    let mut last_key_time = use_signal(|| std::time::Instant::now());
+    let mut sequence = use_signal(Vec::<String>::new);
+    let mut last_key_time = use_signal(std::time::Instant::now);
 
     // Auto-focus wrapper on mount
     use_effect(move || {

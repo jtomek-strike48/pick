@@ -67,8 +67,8 @@ const KONAMI_SEQUENCE: &[&str] = &[
 #[component]
 pub fn KeyboardShortcuts(props: KeyboardShortcutsProps) -> Element {
     // Konami code tracking
-    let mut konami_sequence = use_signal(|| Vec::<String>::new());
-    let mut last_konami_time = use_signal(|| std::time::Instant::now());
+    let mut konami_sequence = use_signal(Vec::<String>::new);
+    let mut last_konami_time = use_signal(std::time::Instant::now);
 
     // Auto-focus the wrapper div on mount and keep re-focusing periodically
     use_effect(move || {
