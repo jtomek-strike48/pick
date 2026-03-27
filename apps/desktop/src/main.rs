@@ -3,7 +3,7 @@
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 
-use pentest_core::config::{BorderRadius, Density, ShellMode, Theme};
+use pentest_core::config::ShellMode;
 use pentest_core::settings::load_settings;
 use pentest_ui::{connector_app, mobile_css, utils_css, ConnectorAppConfig};
 
