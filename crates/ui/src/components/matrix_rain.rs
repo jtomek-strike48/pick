@@ -20,7 +20,7 @@ pub fn MatrixRainOverlay(props: MatrixRainOverlayProps) -> Element {
     use_effect(move || {
         if props.visible {
             spawn(async move {
-                async_std::task::sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 show_text.set(true);
             });
         } else {
@@ -56,7 +56,7 @@ pub fn MatrixRainOverlay(props: MatrixRainOverlayProps) -> Element {
 
         // Initialize canvas animation
         script {
-            dangerous_inner_html: r#"
+            dangerous_inner_html: "
 (function() {
     const canvas = document.getElementById('matrix-rain-canvas');
     if (!canvas) return;
@@ -126,7 +126,7 @@ pub fn MatrixRainOverlay(props: MatrixRainOverlayProps) -> Element {
         canvas.height = window.innerHeight;
     });
 })();
-            "#
+"
         }
     }
 }

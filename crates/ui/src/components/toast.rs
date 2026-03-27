@@ -24,10 +24,10 @@ pub fn Toast(
     use_effect(move || {
         if let Some(ms) = auto_dismiss_ms {
             spawn(async move {
-                async_std::task::sleep(Duration::from_millis(ms)).await;
+                tokio::time::sleep(Duration::from_millis(ms)).await;
                 visible.set(false);
                 // Wait for animation to complete
-                async_std::task::sleep(Duration::from_millis(300)).await;
+                tokio::time::sleep(Duration::from_millis(300)).await;
                 on_dismiss.call(());
             });
         }
@@ -47,7 +47,7 @@ pub fn Toast(
             onclick: move |_| {
                 visible.set(false);
                 spawn(async move {
-                    async_std::task::sleep(Duration::from_millis(300)).await;
+                    tokio::time::sleep(Duration::from_millis(300)).await;
                     on_dismiss.call(());
                 });
             },
