@@ -70,16 +70,23 @@ pub fn KeyboardShortcuts(props: KeyboardShortcutsProps) -> Element {
     let mut konami_sequence = use_signal(|| Vec::<String>::new());
     let mut last_konami_time = use_signal(|| std::time::Instant::now());
 
-    // Auto-focus the wrapper div on mount so keydown events fire immediately.
+    // Auto-focus the wrapper div on mount and keep re-focusing periodically
     use_effect(move || {
         spawn(async move {
-            let _ = document::eval(
-                r#"
-                let el = document.querySelector('[data-shortcut-root]');
-                if (el) el.focus();
-                "#,
-            )
-            .await;
+            // Try multiple times to ensure focus is captured
+            for _ in 0..5 {
+                let _ = document::eval(
+                    r#"
+                    let el = document.querySelector('[data-shortcut-root]');
+                    if (el) {
+                        el.focus();
+                        console.log('KeyboardShortcuts focused');
+                    }
+                    "#,
+                )
+                .await;
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
         });
     });
 
@@ -90,7 +97,7 @@ pub fn KeyboardShortcuts(props: KeyboardShortcutsProps) -> Element {
         div {
             "data-shortcut-root": "true",
             tabindex: 0,
-            style: "outline: none; display: contents;",
+            style: "outline: none; width: 100%; height: 100%; display: flex; flex-direction: column;",
             onkeydown: move |evt: Event<KeyboardData>| {
                 let key = evt.key();
                 let ctrl_key = evt.modifiers().ctrl();

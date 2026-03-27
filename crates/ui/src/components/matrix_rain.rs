@@ -20,12 +20,15 @@ pub fn MatrixRainOverlay(props: MatrixRainOverlayProps) -> Element {
     // Start text fade-in after 0.5 seconds when visible
     use_effect(move || {
         if visible {
+            tracing::info!("Matrix rain overlay visible, starting text fade-in timer");
             show_text.set(false);
             spawn(async move {
                 tokio::time::sleep(Duration::from_millis(500)).await;
+                tracing::info!("Matrix rain text should now appear");
                 show_text.set(true);
             });
         } else {
+            tracing::debug!("Matrix rain overlay hidden");
             show_text.set(false);
         }
     });
