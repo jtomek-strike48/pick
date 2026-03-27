@@ -17,7 +17,6 @@ const KONAMI_SEQUENCE: &[&str] = &[
     "a",
 ];
 
-
 /// Props for the Konami code wrapper
 #[derive(Props, Clone, PartialEq)]
 pub struct KonamiCodeWrapperProps {
