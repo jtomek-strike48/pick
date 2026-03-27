@@ -539,12 +539,14 @@ pub fn connector_app(cfg: ConnectorAppConfig) -> Element {
         let ucss = utils_css();
         let tcss = crate::view_transitions::theme_transitions_css();
         let toast_css = crate::components::toast_css();
+        let matrix_css = crate::components::matrix_rain_css();
         rsx! {
             style { {css} }
             style { {mcss} }
             style { {ucss} }
             style { {tcss} }
             style { {toast_css} }
+            style { {matrix_css} }
         }
     } else {
         rsx! {}
