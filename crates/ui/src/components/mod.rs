@@ -17,8 +17,8 @@ pub mod icons;
 pub mod keyboard_shortcuts;
 mod konami_code;
 pub mod loading_spinner;
-mod matrix_rain;
 mod log_filter_bar;
+mod matrix_rain;
 // router module requires dioxus-router dependency — kept as scaffolding reference
 // #[cfg(feature = "liveview")]
 // pub mod router;
@@ -56,8 +56,8 @@ pub use help_modal::HelpModal;
 pub use keyboard_shortcuts::KeyboardShortcuts;
 pub use konami_code::KonamiCodeWrapper;
 pub use loading_spinner::{LoadingSpinner, SpinnerSize};
-pub use matrix_rain::{matrix_rain_css, MatrixRainOverlay};
 pub use log_filter_bar::LogFilterBar;
+pub use matrix_rain::{matrix_rain_css, MatrixRainOverlay};
 // #[cfg(feature = "liveview")]
 // pub use router::{Route, WorkspaceRouter};
 pub use icons::STRIKE48_SIDEBAR_LOGO_SVG;
