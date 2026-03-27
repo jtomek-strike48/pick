@@ -1,7 +1,6 @@
 //! Konami Code easter egg detector
 
 use dioxus::prelude::*;
-use pentest_core::config::Theme;
 use std::time::Duration;
 
 /// Konami code sequence: ↑ ↑ ↓ ↓ ← → ← → B A
@@ -18,33 +17,6 @@ const KONAMI_SEQUENCE: &[&str] = &[
     "a",
 ];
 
-#[component]
-pub fn KonamiCodeDetector(on_activated: EventHandler<()>) -> Element {
-    let mut sequence = use_signal(|| Vec::<String>::new());
-    let mut last_key_time = use_signal(|| std::time::Instant::now());
-
-    // Global key listener
-    use_effect(move || {
-        spawn(async move {
-            let script = r#"
-                window.addEventListener('keydown', (e) => {
-                    const key = e.key;
-                    dioxus.send({type: 'konami_key', key: key});
-                });
-            "#;
-            let _ = document::eval(script).await;
-        });
-    });
-
-    rsx! {
-        div {
-            style: "display: none;",
-            onmounted: move |_| {
-                // Listen for konami_key events
-            }
-        }
-    }
-}
 
 /// Props for the Konami code wrapper
 #[derive(Props, Clone, PartialEq)]
