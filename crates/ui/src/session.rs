@@ -16,7 +16,9 @@ static CONNECTOR_NAME: LazyLock<RwLock<String>> =
 static TOOL_NAMES: LazyLock<RwLock<Vec<String>>> = LazyLock::new(|| RwLock::new(Vec::new()));
 static ACTION_REGISTRY: LazyLock<pentest_tools::registry::QuickActionRegistry> =
     LazyLock::new(pentest_tools::create_action_registry);
-static TOOL_REGISTRY: LazyLock<Arc<RwLock<Option<Arc<TokioRwLock<ToolRegistry>>>>>> =
+
+type SharedToolRegistry = Arc<RwLock<Option<Arc<TokioRwLock<ToolRegistry>>>>>;
+static TOOL_REGISTRY: LazyLock<SharedToolRegistry> =
     LazyLock::new(|| Arc::new(RwLock::new(None)));
 
 /// Read the current session auth token (Matrix access token for GraphQL).
