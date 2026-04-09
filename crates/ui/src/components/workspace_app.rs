@@ -11,11 +11,13 @@ use dioxus::prelude::*;
 
 use super::app_layout::AppLayout;
 use super::chat_panel::ChatPanel;
+use super::cyberchef_page::CyberChefPage;
 use super::dashboard::Dashboard;
 use super::file_browser::FileBrowser;
 use super::help_modal::HelpModal;
 use super::icons::MessageCircle;
 use super::keyboard_shortcuts::KeyboardShortcuts;
+use super::licenses_page::LicensesPage;
 use super::log_filter_bar::LogFilterBar;
 use super::matrix_rain::MatrixRainOverlay;
 use super::settings_page::SettingsPage;
@@ -134,6 +136,11 @@ pub fn WorkspacePages(props: WorkspacePagesProps) -> Element {
                 }
             }
 
+            // CyberChef
+            if page == NavPage::CyberChef {
+                CyberChefPage {}
+            }
+
             // Files — always mounted so directory state is preserved
             div {
                 class: if page == NavPage::Files { "workspace-pane" } else { "workspace-pane hidden" },
@@ -211,6 +218,11 @@ pub fn WorkspacePages(props: WorkspacePagesProps) -> Element {
                         tracing::info!("Custom theme imported successfully");
                     },
                 }
+            }
+
+            // Licenses
+            if page == NavPage::Licenses {
+                LicensesPage {}
             }
         }
     }
