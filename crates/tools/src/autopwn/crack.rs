@@ -121,8 +121,15 @@ impl PentestTool for AutoPwnCrackTool {
 
             // Verify capture file exists
             if !std::path::Path::new(capture_file).exists() {
+                tracing::error!("✗ Capture file not found: {}", capture_file);
+                tracing::error!("");
+                tracing::error!("Next steps:");
+                tracing::error!("  1. Verify the file path is correct");
+                tracing::error!("  2. Check if the file was moved or deleted");
+                tracing::error!("  3. Capture a new handshake with autopwn_scan");
+                tracing::error!("");
                 return Err(Error::InvalidParams(format!(
-                    "Capture file not found: {}",
+                    "Capture file not found: {}. See logs for next steps.",
                     capture_file
                 )));
             }
@@ -180,8 +187,17 @@ async fn crack_wep(capture_file: &str, bssid: &str) -> Result<CrackResult> {
         .output()
         .await
         .map_err(|e| {
+            tracing::error!("✗ Failed to run aircrack-ng: {}", e);
+            tracing::error!("");
+            tracing::error!("Next steps:");
+            tracing::error!("  1. Install aircrack-ng:");
+            tracing::error!("     sudo apt install aircrack-ng  (Debian/Ubuntu)");
+            tracing::error!("     sudo pacman -S aircrack-ng    (Arch)");
+            tracing::error!("     brew install aircrack-ng      (macOS)");
+            tracing::error!("  2. Verify it's in PATH: which aircrack-ng");
+            tracing::error!("");
             Error::ToolExecution(format!(
-                "Failed to run aircrack-ng (is it installed?): {}",
+                "Failed to run aircrack-ng (not installed?): {}. See logs for next steps.",
                 e
             ))
         })?;
@@ -321,41 +337,56 @@ async fn crack_with_wordlist(
     wordlist: &str,
     timeout_secs: u64,
 ) -> Result<CrackResult> {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
     let start = Instant::now();
 
     tracing::info!("📖 Wordlist: {}", wordlist);
     tracing::info!("🔍 Cracking...");
 
     // Run aircrack-ng with timeout
-    let child = Command::new("aircrack-ng")
+    let mut child = Command::new("aircrack-ng")
         .args(["-w", wordlist, "-b", bssid, capture_file])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| {
+            tracing::error!("✗ Failed to spawn aircrack-ng: {}", e);
+            tracing::error!("");
+            tracing::error!("Next steps:");
+            tracing::error!("  1. Install aircrack-ng:");
+            tracing::error!("     sudo apt install aircrack-ng  (Debian/Ubuntu)");
+            tracing::error!("     sudo pacman -S aircrack-ng    (Arch)");
+            tracing::error!("     brew install aircrack-ng      (macOS)");
+            tracing::error!("  2. Verify it's in PATH: which aircrack-ng");
+            tracing::error!("");
             Error::ToolExecution(format!(
-                "Failed to run aircrack-ng (is it installed?): {}",
+                "Failed to spawn aircrack-ng (not installed?): {}. See logs for next steps.",
                 e
             ))
         })?;
 
-    // Get PID for killing if needed
-    let child_id = child.id();
+    // Stream stdout for progress updates
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| Error::ToolExecution("Failed to capture stdout".into()))?;
+    let mut reader = BufReader::new(stdout).lines();
 
-    // Wait with timeout
-    let timeout = std::time::Duration::from_secs(timeout_secs);
-    let result = tokio::time::timeout(timeout, child.wait_with_output()).await;
+    // Track progress
+    let mut last_progress_log = std::time::Instant::now();
+    let progress_interval = std::time::Duration::from_secs(10); // Log every 10 seconds
+    let mut all_output = String::new();
+    let mut found_password: Option<String> = None;
 
-    let output = match result {
-        Ok(Ok(output)) => output,
-        Ok(Err(e)) => {
-            return Err(Error::ToolExecution(format!("aircrack-ng failed: {}", e)));
-        }
-        Err(_) => {
-            // Timeout - kill process
-            if let Some(pid) = child_id {
-                let _ = Command::new("kill").arg(pid.to_string()).output().await;
-            }
+    // Read output line by line with timeout
+    let deadline = start + std::time::Duration::from_secs(timeout_secs);
+
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            // Timeout reached
+            let _ = child.kill().await;
             tracing::warn!("⏱ Timeout reached ({}s)", timeout_secs);
 
             return Ok(CrackResult {
@@ -366,36 +397,72 @@ async fn crack_with_wordlist(
                 method: "Dictionary Attack (aircrack-ng)".to_string(),
             });
         }
-    };
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+        // Try to read next line with timeout
+        match tokio::time::timeout(std::time::Duration::from_secs(1), reader.next_line()).await {
+            Ok(Ok(Some(line))) => {
+                all_output.push_str(&line);
+                all_output.push('\n');
 
-    // Parse output for key
-    for line in stdout.lines() {
-        if line.contains("KEY FOUND!") {
-            // Extract password from line like "KEY FOUND! [ password123 ]"
-            if let Some(key_part) = line.split('[').nth(1) {
-                if let Some(password) = key_part.split(']').next() {
-                    let password = password.trim().to_string();
-                    let duration = start.elapsed().as_secs();
+                // Check for password found
+                if line.contains("KEY FOUND!") {
+                    if let Some(key_part) = line.split('[').nth(1) {
+                        if let Some(password) = key_part.split(']').next() {
+                            found_password = Some(password.trim().to_string());
+                            break;
+                        }
+                    }
+                }
 
-                    tracing::info!("");
-                    tracing::info!("✓ SUCCESS! Password Found");
-                    tracing::info!("═══════════════════════════════════════════════════");
-                    tracing::info!("  Password: {}", password);
-                    tracing::info!("  Time:     {}s", duration);
-                    tracing::info!("═══════════════════════════════════════════════════");
-
-                    return Ok(CrackResult {
-                        success: true,
-                        password: Some(password),
-                        attempts: 0, // Can't easily track from aircrack-ng output
-                        duration_sec: duration,
-                        method: "Dictionary Attack (aircrack-ng)".to_string(),
-                    });
+                // Log progress periodically (parse aircrack-ng progress line)
+                if line.contains("keys tested") && last_progress_log.elapsed() > progress_interval {
+                    // Extract progress info: "[00:01:23] 123456/1000000 keys tested (12345 k/s)"
+                    if let Some(progress_info) = extract_progress(&line) {
+                        tracing::info!("   Progress: {}", progress_info);
+                        last_progress_log = std::time::Instant::now();
+                    }
+                }
+            }
+            Ok(Ok(None)) => {
+                // Process ended
+                break;
+            }
+            Ok(Err(e)) => {
+                tracing::warn!("Error reading output: {}", e);
+                break;
+            }
+            Err(_) => {
+                // Timeout reading line, continue (keeps connection alive)
+                if last_progress_log.elapsed() > progress_interval {
+                    let elapsed = start.elapsed().as_secs();
+                    tracing::info!("   Still cracking... ({}s elapsed)", elapsed);
+                    last_progress_log = std::time::Instant::now();
                 }
             }
         }
+    }
+
+    // Wait for process to finish
+    let _ = child.wait().await;
+
+    // Check if password was found during streaming
+    if let Some(password) = found_password {
+        let duration = start.elapsed().as_secs();
+
+        tracing::info!("");
+        tracing::info!("✓ SUCCESS! Password Found");
+        tracing::info!("═══════════════════════════════════════════════════");
+        tracing::info!("  Password: {}", password);
+        tracing::info!("  Time:     {}s", duration);
+        tracing::info!("═══════════════════════════════════════════════════");
+
+        return Ok(CrackResult {
+            success: true,
+            password: Some(password),
+            attempts: 0,
+            duration_sec: duration,
+            method: "Dictionary Attack (aircrack-ng)".to_string(),
+        });
     }
 
     tracing::warn!("✗ Password not found in wordlist");
@@ -426,8 +493,18 @@ async fn crack_wpa_mask(
     let hashcat_check = Command::new("which").arg("hashcat").output().await.ok();
 
     if hashcat_check.is_none() || !hashcat_check.unwrap().status.success() {
+        tracing::error!("✗ Hashcat not found");
+        tracing::error!("");
+        tracing::error!("Next steps:");
+        tracing::error!("  1. Install hashcat:");
+        tracing::error!("     sudo apt install hashcat  (Debian/Ubuntu)");
+        tracing::error!("     sudo pacman -S hashcat    (Arch)");
+        tracing::error!("     brew install hashcat      (macOS)");
+        tracing::error!("  2. Or use 'dictionary' method instead of 'mask'");
+        tracing::error!("  3. Or use 'remote' method with a cracking service");
+        tracing::error!("");
         return Err(Error::ToolExecution(
-            "Mask attacks require hashcat (not installed). Use 'dictionary' method instead.".into(),
+            "Mask attacks require hashcat (not installed). See logs for next steps.".into(),
         ));
     }
 
@@ -443,6 +520,28 @@ async fn crack_wpa_mask(
         duration_sec: 0,
         method: "Mask Attack (not implemented)".to_string(),
     })
+}
+
+/// Extract progress information from aircrack-ng output line
+/// Example: "[00:01:23] 123456/1000000 keys tested (12345 k/s)"
+fn extract_progress(line: &str) -> Option<String> {
+    // Look for pattern: "X/Y keys tested (Z k/s)"
+    if let Some(keys_part) = line.split("keys tested").next() {
+        // Extract "X/Y" and speed
+        let parts: Vec<&str> = keys_part.split_whitespace().collect();
+        if let Some(keys) = parts.last() {
+            if keys.contains('/') {
+                // Also extract speed if available
+                if let Some(speed_part) = line.split('(').nth(1) {
+                    if let Some(speed) = speed_part.split(')').next() {
+                        return Some(format!("{} ({})", keys, speed));
+                    }
+                }
+                return Some(keys.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Send handshake to remote cracking service
@@ -470,9 +569,25 @@ async fn crack_wpa_remote(
         capture_data.len() / 1024
     );
 
-    // Send to remote service
+    // Validate endpoint URL
+    let parsed_url = url::Url::parse(endpoint)
+        .map_err(|e| Error::InvalidParams(format!("Invalid endpoint URL: {}", e)))?;
+
+    if parsed_url.scheme() != "https" {
+        tracing::warn!(
+            "Insecure endpoint: using HTTP instead of HTTPS for {}",
+            endpoint
+        );
+    }
+
+    // Send to remote service with extended timeout for remote operations
+    let timeout_secs = std::env::var("REMOTE_CRACK_TIMEOUT_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(300); // Default 5 minutes for remote operations
+
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(timeout_secs))
         .build()
         .map_err(|e| Error::Network(format!("Failed to create HTTP client: {}", e)))?;
 
