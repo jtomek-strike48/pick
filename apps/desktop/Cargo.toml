@@ -21,3 +21,13 @@ dioxus = { workspace = true, features = ["desktop"] }
 
 # Logging
 tracing = { workspace = true }
+
+# Environment configuration
+dotenvy = "0.15"
+
+# Graph visualization (examples require eframe 0.34)
+eframe = "0.34"
+egui = "0.34"
+egui_graphs = "0.30"
+petgraph = "0.8"
+futures = { workspace = true }
