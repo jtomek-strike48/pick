@@ -155,6 +155,13 @@ async fn main() -> anyhow::Result<()> {
                                 auth_token.len()
                             );
                         }
+                        ConnectorEvent::ConnectionError { error, attempt } => {
+                            tracing::error!(
+                                "[connection] error on attempt {}: {}",
+                                attempt,
+                                error
+                            );
+                        }
                     }
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => break,

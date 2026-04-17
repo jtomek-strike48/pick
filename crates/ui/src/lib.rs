@@ -69,6 +69,8 @@ pub struct EventLoopSignals {
     pub settings: dioxus::prelude::Signal<pentest_core::config::AppSettings>,
     pub matrix_api_url: dioxus::prelude::Signal<String>,
     pub matrix_auth_token: dioxus::prelude::Signal<String>,
+    pub connection_error: dioxus::prelude::Signal<Option<String>>,
+    pub retry_attempt: dioxus::prelude::Signal<Option<u32>>,
 }
 
 /// Run the connector event loop, dispatching events to the appropriate Dioxus signals.
@@ -91,9 +93,16 @@ pub async fn run_event_loop(
                 }
                 ConnectorEvent::StepChanged(step) => {
                     signals.connecting_step.set(Some(step));
+                    // Clear error when moving to a new step
+                    signals.connection_error.set(None);
+                    signals.retry_attempt.set(None);
                 }
                 ConnectorEvent::Log(line) => {
                     signals.terminal_lines.write().push(line);
+                }
+                ConnectorEvent::ConnectionError { error, attempt } => {
+                    signals.connection_error.set(Some(error));
+                    signals.retry_attempt.set(Some(attempt));
                 }
                 ConnectorEvent::CredentialsUpdated {
                     auth_token,

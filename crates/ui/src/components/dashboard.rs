@@ -4,7 +4,7 @@ use dioxus::prelude::*;
 use pentest_core::terminal::TerminalLine;
 use pentest_platform::WifiConnectionStatus;
 
-use super::icons::{Bolt, Info, MessageCircle, Network, Shield, Terminal, Wifi};
+use super::icons::{Bolt, ChartNetwork, Info, MessageCircle, Network, Shield, Terminal, Wifi};
 use crate::platform_helper;
 
 /// Connected home screen with status, quick actions, and recent activity.
@@ -19,6 +19,9 @@ pub fn Dashboard(
     /// Callback to show the WiFi warning dialog at the top level (outside overflow containers).
     #[props(default)]
     on_wifi_warning: EventHandler<(WifiConnectionStatus, String)>,
+    /// Callback to load sample graph data into the Knowledge Graph window.
+    #[props(default)]
+    on_load_graph: EventHandler<()>,
 ) -> Element {
     let last_five: Vec<&TerminalLine> = recent_lines.iter().rev().take(5).collect();
     let wifi_adapter = use_memo(move || wifi_adapter.clone());
@@ -144,6 +147,17 @@ pub fn Dashboard(
                             onclick: move |_| on_open_shell.call(()),
                             span { class: "action-card-icon", Terminal { size: 24 } }
                             span { class: "action-card-label", "Shell" }
+                        }
+                        div {
+                            class: "action-card",
+                            onclick: move |_| {
+                                tracing::info!("Knowledge Graph button clicked - loading sample data");
+                                // TODO: Wire up to desktop app's send_sample_graph()
+                                // For now, show placeholder message
+                                on_open_chat.call("📊 Knowledge Graph feature coming soon! The separate graph window is ready, just need to wire up the data flow.".to_string());
+                            },
+                            span { class: "action-card-icon", ChartNetwork { size: 24 } }
+                            span { class: "action-card-label", "Knowledge Graph" }
                         }
                     }
                 }

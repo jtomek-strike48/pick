@@ -21,3 +21,9 @@ dioxus = { workspace = true, features = ["desktop"] }
 
 # Logging
 tracing = { workspace = true }
+
+# Graph visualization for Knowledge Graph window
+eframe = "0.34"
+egui = "0.34"
+egui_graphs = "0.30"
+petgraph = "0.8"

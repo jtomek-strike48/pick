@@ -32,6 +32,12 @@ pub fn ConnectingScreen(
     step: ConnectingStep,
     host: String,
     on_cancel: EventHandler<()>,
+    /// Optional error message to display
+    #[props(default)]
+    error_message: Option<String>,
+    /// Optional retry attempt number
+    #[props(default)]
+    retry_attempt: Option<u32>,
 ) -> Element {
     let active = display_index(step);
 
@@ -94,7 +100,22 @@ pub fn ConnectingScreen(
             } else {
                 div {
                     class: "text-dim",
-                    "{status_text}"
+                    if let Some(attempt) = retry_attempt {
+                        "{status_text} (Attempt {attempt})"
+                    } else {
+                        "{status_text}"
+                    }
+                }
+            }
+
+            // Error message display
+            if let Some(ref error) = error_message {
+                div { class: "connecting-error",
+                    div { class: "error-title", "⚠️ Connection Failed" }
+                    div { class: "error-message", "{error}" }
+                    div { class: "error-hint",
+                        "Check your network connection and server address. The app will continue retrying..."
+                    }
                 }
             }
 

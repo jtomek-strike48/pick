@@ -6,6 +6,7 @@
 pub mod config;
 pub mod connector;
 pub mod error;
+pub mod evidence;
 pub mod export;
 pub mod file_browser;
 pub mod jwt_validator;

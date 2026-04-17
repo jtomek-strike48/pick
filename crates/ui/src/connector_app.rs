@@ -284,6 +284,10 @@ pub fn connector_app(cfg: ConnectorAppConfig) -> Element {
     let mut active_page = use_signal(|| NavPage::Dashboard);
     let workspace_path: Signal<Option<String>> = use_signal(|| None);
     let mut last_seen_terminal_count = use_signal(|| 0usize);
+    #[allow(unused_mut)]
+    let mut connection_error: Signal<Option<String>> = use_signal(|| None);
+    #[allow(unused_mut)]
+    let mut retry_attempt: Signal<Option<u32>> = use_signal(|| None);
 
     // download state
     let mut download_progress: Signal<Option<f64>> =
@@ -417,6 +421,8 @@ pub fn connector_app(cfg: ConnectorAppConfig) -> Element {
                     settings,
                     matrix_api_url,
                     matrix_auth_token,
+                    connection_error,
+                    retry_attempt,
                 },
             ));
 
@@ -582,10 +588,14 @@ pub fn connector_app(cfg: ConnectorAppConfig) -> Element {
 
                 AppScreen::Connecting(step) => {
                     let host = config.read().host.clone();
+                    let error = connection_error.read().clone();
+                    let attempt = retry_attempt.read().clone();
                     rsx! {
                         ConnectingScreen {
                             step: step,
                             host: host,
+                            error_message: error,
+                            retry_attempt: attempt,
                             on_cancel: move |_| {
                                 on_disconnect(());
                             },

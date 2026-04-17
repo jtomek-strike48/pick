@@ -99,3 +99,45 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
 }
+
+/* Error display */
+.connecting-error {
+    max-width: 500px;
+    padding: 16px 20px;
+    background-color: var(--destructive-bg, rgba(239, 68, 68, 0.1));
+    border: 1px solid var(--destructive, #ef4444);
+    border-radius: var(--radius);
+    text-align: center;
+    animation: slideIn 0.3s ease-out;
+}
+
+.error-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--destructive, #ef4444);
+    margin-bottom: 8px;
+}
+
+.error-message {
+    font-size: 14px;
+    color: var(--foreground);
+    margin-bottom: 12px;
+    font-family: var(--font-mono);
+}
+
+.error-hint {
+    font-size: 13px;
+    color: var(--muted-foreground);
+    font-style: italic;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

@@ -128,6 +128,11 @@ pub enum ConnectorEvent {
         error: String,
     },
     Log(TerminalLine),
+    /// Connection error with retry information
+    ConnectionError {
+        error: String,
+        attempt: u32,
+    },
     /// Connector JWT obtained via OTT — should be saved to persist authorization.
     /// `api_url` is the Matrix API base URL (e.g. `https://studio.example.com:8443`).
     CredentialsUpdated {
@@ -538,6 +543,10 @@ impl LiveViewConnector {
                     "Connection failed (attempt {}): {}",
                     connection_failures, e
                 ))));
+                self.send_event(ConnectorEvent::ConnectionError {
+                    error: e.to_string(),
+                    attempt: connection_failures,
+                });
                 self.send_event(ConnectorEvent::StatusChanged(ConnectorStatus::Reconnecting));
                 tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
                 continue;
