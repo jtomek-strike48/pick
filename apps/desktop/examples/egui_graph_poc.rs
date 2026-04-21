@@ -90,7 +90,7 @@ impl KnowledgeGraphApp {
                     NodeType::Evidence => egui::Color32::from_rgb(52, 152, 219), // Blue
                     NodeType::Hypothesis => egui::Color32::from_rgb(241, 196, 15), // Yellow
                     NodeType::ExploitAttempt => egui::Color32::from_rgb(230, 126, 34), // Orange
-                    NodeType::Finding => egui::Color32::from_rgb(231, 76, 60),     // Red
+                    NodeType::Finding => egui::Color32::from_rgb(231, 76, 60),   // Red
                 };
                 n.set_color(color);
                 n.set_label(n.payload().label.clone());
@@ -142,24 +142,33 @@ impl App for KnowledgeGraphApp {
             if let Some(node) = self.graph.node(*selected) {
                 let data = node.payload();
 
-                egui::SidePanel::right("details").min_size(300.0).show_inside(ui, |ui| {
-                    ui.heading("Node Details");
-                    ui.separator();
-                    ui.label(format!("Title: {}", data.label));
-                    ui.label(format!("Type: {:?}", data.node_type));
-                    ui.label(format!("Confidence: {:.0}%", data.confidence * 100.0));
-                    ui.separator();
-                    ui.label("Description:");
-                    ui.label(&data.description);
-                });
+                egui::SidePanel::right("details")
+                    .min_size(300.0)
+                    .show_inside(ui, |ui| {
+                        ui.heading("Node Details");
+                        ui.separator();
+                        ui.label(format!("Title: {}", data.label));
+                        ui.label(format!("Type: {:?}", data.node_type));
+                        ui.label(format!("Confidence: {:.0}%", data.confidence * 100.0));
+                        ui.separator();
+                        ui.label("Description:");
+                        ui.label(&data.description);
+                    });
             }
         }
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            let view = &mut GraphView::<_, _, _, _, egui_graphs::DefaultNodeShape, egui_graphs::DefaultEdgeShape>::new(&mut self.graph)
-                .with_navigations(&SettingsNavigation::default())
-                .with_interactions(&SettingsInteraction::default())
-                .with_styles(&SettingsStyle::default());
+            let view = &mut GraphView::<
+                _,
+                _,
+                _,
+                _,
+                egui_graphs::DefaultNodeShape,
+                egui_graphs::DefaultEdgeShape,
+            >::new(&mut self.graph)
+            .with_navigations(&SettingsNavigation::default())
+            .with_interactions(&SettingsInteraction::default())
+            .with_styles(&SettingsStyle::default());
             ui.add(view);
         });
     }
