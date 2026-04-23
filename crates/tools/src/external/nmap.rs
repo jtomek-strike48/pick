@@ -5,6 +5,7 @@
 
 use async_trait::async_trait;
 use pentest_core::error::Result;
+use pentest_core::timeout::ToolTimeouts;
 use pentest_core::tools::{
     execute_timed, ParamType, PentestTool, Platform, ToolContext, ToolParam, ToolResult, ToolSchema,
 };
@@ -95,8 +96,8 @@ impl PentestTool for NmapTool {
             .param(ToolParam::optional(
                 "timeout",
                 ParamType::Integer,
-                "Overall timeout in seconds (default: 300)",
-                json!(300),
+                "Overall timeout in seconds (default: 600, range: 30-3600)",
+                json!(600),
             ))
             .platforms(vec![Platform::Desktop, Platform::Tui])
     }
@@ -130,7 +131,16 @@ impl PentestTool for NmapTool {
             let aggressive = param_bool(&params, "aggressive", false);
             let timing = param_u64(&params, "timing", 3).clamp(0, 5);
             let no_ping = param_bool(&params, "no_ping", false);
-            let timeout = param_u64(&params, "timeout", 300);
+
+            // Get timeout with intelligent defaults and bounds checking
+            let timeouts = ToolTimeouts::default();
+            let default_timeout = timeouts.get_by_tool_name("nmap");
+            let user_timeout =
+                Duration::from_secs(param_u64(&params, "timeout", default_timeout.as_secs()));
+            let timeout = pentest_core::timeout::clamp_timeout(
+                user_timeout,
+                pentest_core::timeout::categorize_tool("nmap"),
+            );
 
             // Build nmap command
             let mut builder = CommandBuilder::new();
@@ -200,9 +210,9 @@ impl PentestTool for NmapTool {
             let args = builder.build();
             let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
-            // Execute nmap
+            // Execute nmap with configured timeout
             let result = platform
-                .execute_command("nmap", &args_refs, Duration::from_secs(timeout))
+                .execute_command("nmap", &args_refs, timeout)
                 .await?;
 
             // Read XML output
