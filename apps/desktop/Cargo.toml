@@ -9,6 +9,13 @@ license.workspace = true
 name = "pentest-connector"
 path = "src/main.rs"
 
+[[example]]
+name = "egui_graph_poc"
+required-features = ["egui_poc"]
+
+[features]
+egui_poc = []
+
 [dependencies]
 # Crates
 pentest-core = { workspace = true, features = ["browser-auth"] }

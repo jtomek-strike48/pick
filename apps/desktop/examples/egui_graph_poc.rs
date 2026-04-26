@@ -1,6 +1,9 @@
 //! Proof-of-concept: egui_graphs rendering Knowledge Graph
 //!
-//! Run with: RUSTUP_TOOLCHAIN= cargo run --example egui_graph_poc
+//! **Note**: This example requires the `egui_poc` feature and mock evidence data that
+//! is not yet implemented in pentest-core. It is excluded from CI builds.
+//!
+//! Run with: cargo run --example egui_graph_poc --features egui_poc
 //!
 //! This demonstrates that egui_graphs can replace Cytoscape.js for graph visualization,
 //! eliminating JavaScript bridge issues in the Dioxus desktop app.
