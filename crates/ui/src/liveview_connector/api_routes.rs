@@ -284,7 +284,8 @@ async fn post_aggression(
                 Ok(_) => {
                     tracing::info!(
                         "Aggression update notification sent to agent {} (conversation {})",
-                        agent_id, conversation_id
+                        agent_id,
+                        conversation_id
                     );
                     true
                 }
@@ -292,7 +293,8 @@ async fn post_aggression(
                     tracing::error!(
                         "Failed to send aggression update to agent {}: {}. \
                          Local state updated successfully, but agent was not notified.",
-                        agent_id, e
+                        agent_id,
+                        e
                     );
                     false
                 }

@@ -460,7 +460,7 @@ impl LiveViewConnector {
                                             );
                                             // Brief exponential backoff: 1ms, 2ms, 4ms
                                             tokio::time::sleep(tokio::time::Duration::from_millis(
-                                                1 << retry_count
+                                                1 << retry_count,
                                             ))
                                             .await;
                                         }
@@ -540,7 +540,9 @@ impl LiveViewConnector {
                                         if let Ok(mut scan_guard) = self.active_scan.try_write() {
                                             if let Some(ref mut scan) = *scan_guard {
                                                 // Check specialist limit before adding
-                                                if scan.active_specialists.len() >= MAX_SPECIALISTS_PER_SCAN {
+                                                if scan.active_specialists.len()
+                                                    >= MAX_SPECIALISTS_PER_SCAN
+                                                {
                                                     tracing::warn!(
                                                         "Max specialists limit reached ({}). \
                                                          Specialist {} will not be tracked.",
@@ -550,8 +552,10 @@ impl LiveViewConnector {
                                                     break;
                                                 }
 
-                                                scan.active_specialists
-                                                    .insert(agent_id.to_string(), specialist_info.clone());
+                                                scan.active_specialists.insert(
+                                                    agent_id.to_string(),
+                                                    specialist_info.clone(),
+                                                );
                                                 tracing::info!(
                                                     "Specialist tracked: type={} agent={} targets={}",
                                                     specialist_type,
@@ -575,9 +579,11 @@ impl LiveViewConnector {
                                                     max_retries
                                                 );
                                                 // Brief exponential backoff: 1ms, 2ms, 4ms
-                                                tokio::time::sleep(tokio::time::Duration::from_millis(
-                                                    1 << retry_count
-                                                ))
+                                                tokio::time::sleep(
+                                                    tokio::time::Duration::from_millis(
+                                                        1 << retry_count,
+                                                    ),
+                                                )
                                                 .await;
                                             }
                                         }
