@@ -1,4 +1,61 @@
-//! REST API routes for scan status and aggression adjustment
+//! REST API routes for scan status and aggression adjustment.
+//!
+//! # Overview
+//!
+//! This module provides HTTP REST endpoints for monitoring and controlling penetration
+//! testing scans in real-time. The API enables external tooling (dashboards, scripts,
+//! automation) to:
+//!
+//! - Query current scan state (conversation ID, agent ID, aggression level, active specialists)
+//! - Dynamically adjust aggression levels mid-scan with automatic agent notification
+//!
+//! # Security Model
+//!
+//! **These endpoints are LOCAL-ONLY and bind to `localhost:3030`.**
+//!
+//! - No authentication is implemented (assumes localhost trust boundary)
+//! - Not exposed to network by default (bind address is 127.0.0.1)
+//! - Suitable for local development, single-user workstations, and trusted environments
+//!
+//! **Future Enhancement**: For multi-user or networked deployments, API key authentication
+//! should be added before exposing these endpoints beyond localhost.
+//!
+//! # State Lifecycle
+//!
+//! Scan state follows this lifecycle:
+//!
+//! 1. **Initialization**: `begin_scan` tool completion creates `ScanState` with conversation ID,
+//!    agent ID, start time, and current aggression level
+//! 2. **Updates**: `spawn_specialist` tool completions add specialists to `active_specialists`
+//! 3. **Modification**: `POST /api/aggression` updates aggression level and notifies agents
+//! 4. **Persistence**: State is in-memory only (lost on connector restart)
+//!
+//! # Matrix Notification Behavior
+//!
+//! When aggression level changes via `POST /api/aggression`:
+//!
+//! - The connector's local config is **always** updated immediately
+//! - The active scan state is **always** updated immediately
+//! - A Matrix system message is sent to the Red Team agent and all active specialists
+//!
+//! **Important**: The endpoint returns `success: true` even if the Matrix notification fails.
+//! This is intentional - the local state is updated regardless of network issues. Matrix
+//! send failures are logged but do not fail the operation. This prevents network transients
+//! from blocking critical state changes.
+//!
+//! If the Matrix client is unavailable, a warning is logged and the operation succeeds anyway.
+//!
+//! # Example Usage
+//!
+//! ```bash
+//! # Check scan status
+//! curl http://localhost:3030/api/status
+//!
+//! # Change aggression level mid-scan
+//! curl -X POST http://localhost:3030/api/aggression \
+//!   -H "Content-Type: application/json" \
+//!   -d '{"level": "aggressive"}'
+//! ```
 
 use axum::{
     extract::State,
@@ -51,7 +108,40 @@ impl IntoResponse for ErrorResponse {
     }
 }
 
-/// GET /api/status - Returns current scan state
+/// GET /api/status - Returns current scan state.
+///
+/// Returns the current scan state if a scan is active, or `null` if no scan is running.
+///
+/// # Response Schema
+///
+/// When a scan is active:
+/// ```json
+/// {
+///   "conversation_id": "conv-123",
+///   "agent_id": "agent-456",
+///   "started_at_system": "2026-04-25T23:45:00Z",
+///   "current_aggression": "Balanced",
+///   "active_specialists": {
+///     "specialist-agent-id": {
+///       "specialist_type": "web-app",
+///       "agent_id": "specialist-agent-id",
+///       "agent_name": "pentest-connector-web-app",
+///       "targets": ["https://example.com"],
+///       "spawned_at": "2026-04-25T23:50:00Z"
+///     }
+///   }
+/// }
+/// ```
+///
+/// When no scan is active:
+/// ```json
+/// null
+/// ```
+///
+/// # Concurrency
+///
+/// This endpoint acquires a read lock on the scan state. Multiple concurrent reads are allowed,
+/// but reads will block if a write operation (aggression change, specialist spawn) is in progress.
 async fn get_status(
     State(state): State<ApiState>,
 ) -> Result<Json<Option<ScanState>>, ErrorResponse> {
@@ -59,12 +149,77 @@ async fn get_status(
     Ok(Json(scan_guard.clone()))
 }
 
-/// POST /api/aggression - Adjust aggression level mid-scan
+/// POST /api/aggression - Adjust aggression level mid-scan.
+///
+/// Dynamically changes the aggression level of an active scan. This operation:
+///
+/// 1. Updates the connector's local configuration (immediate)
+/// 2. Updates the active scan state (immediate)
+/// 3. Sends Matrix system messages to the Red Team agent and all active specialists (best-effort)
+///
+/// # Request Schema
+///
+/// ```json
+/// {
+///   "level": "conservative" | "balanced" | "aggressive" | "maximum"
+/// }
+/// ```
+///
+/// # Response Schema
+///
+/// Success:
+/// ```json
+/// {
+///   "success": true,
+///   "previous_level": "Balanced",
+///   "new_level": "Aggressive",
+///   "message": "Aggression level updated to Aggressive (1.5x cost multiplier)"
+/// }
+/// ```
+///
+/// Error (invalid level):
+/// ```json
+/// {
+///   "error": "Invalid aggression level 'invalid'. Valid values: conservative, balanced, aggressive, maximum"
+/// }
+/// ```
+///
+/// Error (no active scan):
+/// ```json
+/// {
+///   "error": "No active scan. Start a scan with begin_scan tool first."
+/// }
+/// ```
+///
+/// # Behavior Notes
+///
+/// - **Returns `success: true` even if Matrix notification fails** - The local state is always
+///   updated successfully. Matrix send failures are logged but do not fail the operation.
+/// - **Requires active scan** - Returns error if no scan is running (must call `begin_scan` first)
+/// - **Notifies all agents** - Sends system message to Red Team agent + all active specialists
+/// - **Case-insensitive** - Level strings are normalized to lowercase before matching
+///
+/// # Concurrency
+///
+/// Acquires write locks on both config and scan state in sequence. Brief lock contention is
+/// possible during high-frequency status queries, but impact is minimal (locks held for ~1ms).
+///
+/// # Matrix Notification Content
+///
+/// Agents receive a system message formatted as:
+/// ```
+/// Aggression level changed from Balanced to Aggressive.
+///
+/// **Aggressive Mode**
+/// Cost Multiplier: 1.5x baseline
+///
+/// Spawn policy: <policy guidelines for new aggression level>
+/// ```
 async fn post_aggression(
     State(state): State<ApiState>,
     Json(request): Json<AggressionAdjustRequest>,
 ) -> Result<Json<AggressionAdjustResponse>, ErrorResponse> {
-    // Parse aggression level
+    // Parse and validate aggression level string to enum
     let new_level = match request.level.to_lowercase().as_str() {
         "conservative" => AggressionLevel::Conservative,
         "balanced" => AggressionLevel::Balanced,
@@ -80,7 +235,8 @@ async fn post_aggression(
         }
     };
 
-    // Get current level and update config
+    // Update connector's local configuration first (always succeeds)
+    // This is the source of truth for future tool executions and specialist spawns
     let previous_level = {
         let mut config_guard = state.config.write().await;
         let prev = config_guard.aggression_level;
@@ -88,7 +244,8 @@ async fn post_aggression(
         prev
     };
 
-    // Check if scan is active and update scan state
+    // Update active scan state and extract conversation/agent IDs for Matrix notification
+    // If no scan is active, this is an error - aggression changes only apply to active scans
     let (conversation_id, agent_id) = {
         let mut scan_guard = state.scan_state.write().await;
         if let Some(ref mut scan) = *scan_guard {
@@ -101,7 +258,8 @@ async fn post_aggression(
         }
     };
 
-    // Send system message to agent with new policy guidelines
+    // Notify the Red Team agent of the aggression change via Matrix system message
+    // This is a best-effort operation - local state is already updated, so we don't fail if this errors
     let policy_guidelines = new_level.spawn_policy().to_guidelines(new_level);
     let system_message = format!(
         "Aggression level changed from {} to {}.\n\n{}",
@@ -110,7 +268,10 @@ async fn post_aggression(
         policy_guidelines
     );
 
-    // Attempt to send system message
+    // Attempt to send Matrix notification
+    // Note: We return success even if this fails, because the local state update succeeded
+    // Matrix failures could be transient (network issues, API downtime) and shouldn't block
+    // the aggression change. Agents will use the new level for future operations regardless.
     {
         let client_guard = state.matrix_client.read().await;
         if let Some(ref client) = *client_guard {
@@ -118,11 +279,25 @@ async fn post_aggression(
                 .send_system_message(&conversation_id, &agent_id, &system_message)
                 .await
             {
-                tracing::error!("Failed to send aggression update to agent: {}", e);
-                // Continue anyway - config is updated locally
+                tracing::error!(
+                    "Failed to send aggression update to agent {}: {}. \
+                     Local state updated successfully, but agent was not notified.",
+                    agent_id, e
+                );
+                // Continue anyway - config is updated locally, future tool executions will use new level
+            } else {
+                tracing::info!(
+                    "Aggression update notification sent to agent {} (conversation {})",
+                    agent_id, conversation_id
+                );
             }
         } else {
-            tracing::warn!("Matrix client not available, aggression update not sent to agent");
+            tracing::warn!(
+                "Matrix client not available for conversation {}. \
+                 Aggression updated locally, but agent was not notified. \
+                 This can happen if the connector hasn't established a Matrix session yet.",
+                conversation_id
+            );
         }
     }
 

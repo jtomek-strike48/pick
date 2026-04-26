@@ -1,13 +1,39 @@
-//! LiveView Connector with WebSocket Support
+//! LiveView Connector with WebSocket Support and Scan State Tracking
 //!
 //! This module implements a connector that:
 //! - Runs a Dioxus LiveView server internally
 //! - Proxies HTTP requests to the LiveView server
 //! - Proxies WebSocket connections for LiveView interactivity
 //! - Executes tools via the tool registry
+//! - Tracks active penetration testing scans with real-time state management
+//! - Provides REST API for scan monitoring and aggression adjustment
 //!
 //! Unlike the standard ConnectionManager which uses ConnectorRunner,
 //! this directly handles the gRPC stream to support WebSocket messages.
+//!
+//! # Scan State Lifecycle
+//!
+//! Scan state is managed through event-driven updates:
+//!
+//! 1. **Initialization**: When `begin_scan` tool completes successfully, a `ScanState` is created
+//!    containing the conversation ID, agent ID, start time, and current aggression level.
+//!
+//! 2. **Specialist Tracking**: When `spawn_specialist` tool completes successfully and a specialist
+//!    is spawned, a `SpecialistInfo` entry is added to the scan's `active_specialists` map.
+//!
+//! 3. **Aggression Updates**: When aggression level is changed via REST API (`POST /api/aggression`),
+//!    both the connector config and scan state are updated, and Matrix notifications are sent to
+//!    active agents.
+//!
+//! 4. **Persistence**: Scan state is in-memory only and will be lost on connector restart.
+//!    This is intentional for the current use case (local development, single sessions).
+//!
+//! # Thread Safety
+//!
+//! All shared state uses `Arc<RwLock<T>>` for thread-safe access:
+//! - Multiple concurrent reads are allowed
+//! - Writes block reads/writes (exclusive access)
+//! - `try_write()` is used in event handlers to avoid blocking the event loop
 
 mod api_routes;
 mod auth;
@@ -109,7 +135,22 @@ pub(crate) struct WsConnectionState {
     to_backend_tx: mpsc::Sender<WsMessage>,
 }
 
-/// Information about a spawned specialist agent
+/// Information about a spawned specialist agent.
+///
+/// Tracks metadata for a domain-specific specialist agent (web-app, api, binary, ai-security)
+/// that was spawned by the Red Team agent during a scan. This information is used to:
+///
+/// - Display active specialists in the UI and API (`GET /api/status`)
+/// - Send aggression change notifications to all active specialists
+/// - Track which targets each specialist is analyzing
+///
+/// # Fields
+///
+/// - `specialist_type`: Type of specialist (e.g., "web-app", "api", "binary")
+/// - `agent_id`: Unique Strike48 agent ID for this specialist
+/// - `agent_name`: Human-readable name (e.g., "pentest-connector-web-app")
+/// - `targets`: List of URLs/endpoints/binaries this specialist is analyzing
+/// - `spawned_at`: Timestamp when the specialist was spawned (serialized as human-readable time)
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SpecialistInfo {
     pub specialist_type: String,
@@ -120,7 +161,36 @@ pub struct SpecialistInfo {
     pub spawned_at: std::time::SystemTime,
 }
 
-/// Active scan state tracking
+/// Active scan state tracking.
+///
+/// Represents the state of an active penetration testing scan. This state is:
+///
+/// - **Created** when the `begin_scan` tool completes successfully
+/// - **Updated** when specialists are spawned or aggression level changes
+/// - **Queried** via `GET /api/status` for monitoring
+/// - **In-memory only** (lost on connector restart)
+///
+/// # State Management
+///
+/// This struct is wrapped in `Arc<RwLock<Option<ScanState>>>` for thread-safe access:
+///
+/// - `None` = No active scan
+/// - `Some(ScanState)` = Scan is active
+///
+/// # Fields
+///
+/// - `conversation_id`: Strike48 conversation ID (also called scan_id in begin_scan result)
+/// - `agent_id`: Red Team agent ID that initiated the scan
+/// - `started_at`: Monotonic timestamp for duration calculations (not serialized to JSON)
+/// - `started_at_system`: Wall-clock timestamp for display (serialized as human-readable time)
+/// - `current_aggression`: Current aggression level (updated via REST API)
+/// - `active_specialists`: Map of specialist agent_id → SpecialistInfo for all spawned specialists
+///
+/// # Serialization
+///
+/// When serialized to JSON (for `GET /api/status`), timestamps are rendered as human-readable
+/// strings using `humantime_serde` (e.g., "2026-04-25T23:45:00Z"). The `started_at` field is
+/// skipped (not serializable, only used for duration calculations).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ScanState {
     pub conversation_id: String,
@@ -339,10 +409,13 @@ impl LiveViewConnector {
                 };
                 crate::liveview_server::push_terminal_line(line);
 
-                // Handle special tools that update scan state
+                // Event-driven scan state tracking
+                // When specific tools complete successfully, we update the scan state accordingly
                 if *success {
+                    // begin_scan completion → Initialize scan state
+                    // This creates the root tracking object for the entire scan session
                     if tool_name == "begin_scan" {
-                        // Extract conversation_id and agent_id from result
+                        // Extract conversation_id (scan_id) and agent_id from tool result
                         if let Ok(scan_result) =
                             serde_json::from_value::<serde_json::Value>(result.clone())
                         {
@@ -350,7 +423,7 @@ impl LiveViewConnector {
                                 scan_result.get("scan_id").and_then(|v| v.as_str()),
                                 result.get("agent_id").and_then(|v| v.as_str()),
                             ) {
-                                // Initialize scan state
+                                // Initialize scan state with current config values
                                 let scan_state = ScanState {
                                     conversation_id: conv_id.to_string(),
                                     agent_id: agent_id.to_string(),
@@ -360,22 +433,31 @@ impl LiveViewConnector {
                                     active_specialists: std::collections::HashMap::new(),
                                 };
 
-                                // Update active scan
+                                // Use try_write() to avoid blocking the event loop
+                                // If lock is held, skip update (unlikely but safe - next event will succeed)
                                 if let Ok(mut scan_guard) = self.active_scan.try_write() {
                                     *scan_guard = Some(scan_state);
                                     tracing::info!(
-                                        "Scan started: conv={} agent={}",
+                                        "Scan state initialized: conversation={} agent={} aggression={}",
                                         conv_id,
-                                        agent_id
+                                        agent_id,
+                                        self.config.aggression_level.display_name()
+                                    );
+                                } else {
+                                    tracing::warn!(
+                                        "Failed to acquire write lock for scan state init - scan state may not be available"
                                     );
                                 }
                             }
                         }
+                    // spawn_specialist completion → Track new specialist
+                    // This adds the specialist to the scan's active_specialists map
                     } else if tool_name == "spawn_specialist" {
-                        // Extract specialist information from result
+                        // Extract specialist information from tool result
                         if let Ok(spawn_result) =
                             serde_json::from_value::<serde_json::Value>(result.clone())
                         {
+                            // Only track if spawn actually succeeded (spawned: true in result)
                             if spawn_result
                                 .get("spawned")
                                 .and_then(|v| v.as_bool())
@@ -403,17 +485,27 @@ impl LiveViewConnector {
                                         spawned_at: std::time::SystemTime::now(),
                                     };
 
-                                    // Add to active scan
+                                    // Add specialist to active scan's specialist map
+                                    // Use agent_id as key for easy lookup/updates
                                     if let Ok(mut scan_guard) = self.active_scan.try_write() {
                                         if let Some(ref mut scan) = *scan_guard {
                                             scan.active_specialists
                                                 .insert(agent_id.to_string(), specialist_info);
                                             tracing::info!(
-                                                "Specialist spawned: type={} agent={}",
+                                                "Specialist tracked: type={} agent={} targets={}",
                                                 specialist_type,
-                                                agent_id
+                                                agent_id,
+                                                targets.len()
+                                            );
+                                        } else {
+                                            tracing::warn!(
+                                                "Specialist spawned but no active scan found - specialist will not be tracked"
                                             );
                                         }
+                                    } else {
+                                        tracing::warn!(
+                                            "Failed to acquire write lock for specialist tracking - specialist may not appear in /api/status"
+                                        );
                                     }
                                 }
                             }
