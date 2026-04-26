@@ -27,8 +27,6 @@ struct EdgeData {
 
 struct KnowledgeGraphApp {
     graph: Graph<NodeData, EdgeData>,
-    loading: bool,
-    error: Option<String>,
 }
 
 impl KnowledgeGraphApp {
@@ -41,11 +39,7 @@ impl KnowledgeGraphApp {
 
         let graph = Self::convert_to_graph(kg);
 
-        Self {
-            graph,
-            loading: false,
-            error: None,
-        }
+        Self { graph }
     }
 
     fn convert_to_graph(kg: KnowledgeGraph) -> Graph<NodeData, EdgeData> {
@@ -67,13 +61,22 @@ impl KnowledgeGraphApp {
 
         // Add edges
         for edge in &kg.edges {
-            if let (Some(&from_idx), Some(&to_idx)) =
-                (node_map.get(&edge.from), node_map.get(&edge.to))
-            {
-                let data = EdgeData {
-                    label: format!("{:?}", edge.relationship),
-                };
-                graph.add_edge(from_idx, to_idx, data);
+            match (node_map.get(&edge.from), node_map.get(&edge.to)) {
+                (Some(&from_idx), Some(&to_idx)) => {
+                    let data = EdgeData {
+                        label: format!("{:?}", edge.relationship),
+                    };
+                    graph.add_edge(from_idx, to_idx, data);
+                }
+                (None, _) => {
+                    eprintln!(
+                        "Warning: Edge references missing 'from' node: {}",
+                        edge.from
+                    );
+                }
+                (_, None) => {
+                    eprintln!("Warning: Edge references missing 'to' node: {}", edge.to);
+                }
             }
         }
 
@@ -119,24 +122,6 @@ impl App for KnowledgeGraphApp {
             });
         });
 
-        if let Some(ref error) = self.error {
-            egui::CentralPanel::default().show_inside(ui, |ui| {
-                ui.centered_and_justified(|ui| {
-                    ui.label(format!("Error: {}", error));
-                });
-            });
-            return;
-        }
-
-        if self.loading {
-            egui::CentralPanel::default().show_inside(ui, |ui| {
-                ui.centered_and_justified(|ui| {
-                    ui.label("Loading graph data...");
-                });
-            });
-            return;
-        }
-
         // Show node details if selected
         if let Some(selected) = self.graph.selected_nodes().first() {
             if let Some(node) = self.graph.node(*selected) {
@@ -174,7 +159,7 @@ impl App for KnowledgeGraphApp {
     }
 }
 
-fn main() {
+fn main() -> Result<(), eframe::Error> {
     let options = NativeOptions::default();
 
     run_native(
@@ -182,5 +167,4 @@ fn main() {
         options,
         Box::new(|cc| Ok(Box::new(KnowledgeGraphApp::new(cc)))),
     )
-    .unwrap();
 }
