@@ -58,8 +58,9 @@
 //! ```
 
 use axum::{
-    extract::State,
+    extract::{DefaultBodyLimit, Request, State},
     http::StatusCode,
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -68,7 +69,9 @@ use pentest_core::aggression::AggressionLevel;
 use pentest_core::config::ConnectorConfig;
 use pentest_core::matrix::MatrixChatClient;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 use super::ScanState;
@@ -79,6 +82,38 @@ pub struct ApiState {
     pub scan_state: Arc<RwLock<Option<ScanState>>>,
     pub config: Arc<RwLock<ConnectorConfig>>,
     pub matrix_client: Arc<RwLock<Option<MatrixChatClient>>>,
+    pub auth_token: String,
+}
+
+/// Rate limiter using sliding window algorithm
+#[derive(Clone)]
+struct RateLimiter {
+    requests: Arc<RwLock<HashMap<String, Vec<Instant>>>>,
+    max_requests: usize,
+    window: Duration,
+}
+
+impl RateLimiter {
+    fn new(max_requests: usize, window: Duration) -> Self {
+        Self {
+            requests: Arc::new(RwLock::new(HashMap::new())),
+            max_requests,
+            window,
+        }
+    }
+
+    async fn check(&self, key: &str) -> bool {
+        let mut requests = self.requests.write().await;
+        let now = Instant::now();
+        let entry = requests.entry(key.to_string()).or_insert_with(Vec::new);
+        entry.retain(|&timestamp| now.duration_since(timestamp) < self.window);
+        if entry.len() < self.max_requests {
+            entry.push(now);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// Request body for aggression level adjustment
@@ -109,6 +144,42 @@ impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
         (StatusCode::BAD_REQUEST, Json(self)).into_response()
     }
+}
+
+/// Authentication middleware - validates Bearer token
+async fn auth_middleware(
+    State(state): State<ApiState>,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let auth_header = request
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok());
+
+    if let Some(auth) = auth_header {
+        if let Some(token) = auth.strip_prefix("Bearer ") {
+            if token == state.auth_token {
+                return Ok(next.run(request).await);
+            }
+        }
+    }
+
+    tracing::warn!("Unauthorized API access attempt");
+    Err(StatusCode::UNAUTHORIZED)
+}
+
+/// Rate limiting middleware
+async fn rate_limit_middleware(
+    State(limiter): State<RateLimiter>,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    if !limiter.check("localhost").await {
+        tracing::warn!("Rate limit exceeded for API endpoint");
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+    Ok(next.run(request).await)
 }
 
 /// GET /api/status - Returns current scan state.
@@ -229,8 +300,14 @@ async fn post_aggression(
         "aggressive" => AggressionLevel::Aggressive,
         "maximum" => AggressionLevel::Maximum,
         _ => {
-            // Log the actual invalid input but don't echo it back to the client
-            tracing::warn!("Invalid aggression level received: {}", request.level);
+            // Sanitize input before logging to prevent log injection
+            let sanitized = request
+                .level
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+                .take(50)
+                .collect::<String>();
+            tracing::warn!("Invalid aggression level received: {}", sanitized);
             return Err(ErrorResponse {
                 error: "Invalid aggression level. Valid values: conservative, balanced, aggressive, maximum".to_string(),
             });
@@ -325,9 +402,25 @@ async fn post_aggression(
 
 /// Create API router with scan status and aggression routes
 pub fn create_api_routes(state: ApiState) -> Router {
+    let rate_limiter = RateLimiter::new(10, Duration::from_secs(60));
+
+    // Create a separate router for the aggression endpoint with rate limiting and body size limit
+    let aggression_router = Router::new()
+        .route("/api/aggression", post(post_aggression))
+        .layer(middleware::from_fn_with_state(
+            rate_limiter,
+            rate_limit_middleware,
+        ))
+        .layer(DefaultBodyLimit::max(1024 * 1024));
+
+    // Merge all routes and apply authentication middleware to everything
     Router::new()
         .route("/api/status", get(get_status))
-        .route("/api/aggression", post(post_aggression))
+        .merge(aggression_router)
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .with_state(state)
 }
 
@@ -364,6 +457,7 @@ mod tests {
             scan_state: scan_state.clone(),
             config: Arc::new(RwLock::new(config)),
             matrix_client: Arc::new(RwLock::new(None)),
+            auth_token: "test-token".to_string(),
         };
 
         // Verify we can read scan state through API state

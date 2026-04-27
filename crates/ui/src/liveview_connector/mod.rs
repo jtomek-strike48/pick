@@ -653,6 +653,7 @@ impl LiveViewConnector {
             scan_state: self.active_scan.clone(),
             config: Arc::new(RwLock::new(self.config.clone())),
             matrix_client: self.matrix_client.clone(),
+            auth_token: self.config.auth_token.clone(),
         };
         let api_routes_router = api_routes::create_api_routes(api_state);
 
