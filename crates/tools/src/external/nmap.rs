@@ -94,8 +94,8 @@ impl PentestTool for NmapTool {
             .param(ToolParam::optional(
                 "timeout",
                 ParamType::Integer,
-                "Overall timeout in seconds (default: 1800). Full port scans (-p-) across multiple hosts require 1800-3600s. Top1000 scans typically complete in 60-300s.",
-                json!(1800),
+                "Overall timeout in seconds (default: auto-calculated based on hosts, ports, timing). Auto calculation: top100=60-180s, top1000=60-600s, full=1800-7200s. Override only if you know the scan will take longer.",
+                json!(null),
             ))
             .platforms(vec![Platform::Desktop, Platform::Tui])
     }
@@ -126,7 +126,20 @@ impl PentestTool for NmapTool {
             let aggressive = param_bool(&params, "aggressive", false);
             let timing = param_u64(&params, "timing", 3).clamp(0, 5);
             let no_ping = param_bool(&params, "no_ping", false);
-            let timeout = param_u64(&params, "timeout", 1800);
+
+            // Calculate smart timeout based on scan parameters
+            // If user provided explicit timeout, use it. Otherwise calculate.
+            let timeout = if params.get("timeout").and_then(|v| v.as_u64()).is_some() {
+                param_u64(&params, "timeout", 300) // User-provided
+            } else {
+                calculate_timeout(
+                    &target,
+                    &ports,
+                    &scan_type,
+                    timing,
+                    service_detection || aggressive,
+                )
+            };
 
             // Build nmap command
             let mut builder = CommandBuilder::new();
@@ -293,4 +306,139 @@ fn extract_xml_attribute(xml: &str, pattern: &str) -> Option<String> {
         .captures(xml)?
         .get(1)
         .map(|m| m.as_str().to_string())
+}
+
+/// Calculate smart timeout based on scan parameters
+///
+/// Factors considered:
+/// - Number of target hosts (from CIDR, space-separated IPs, etc.)
+/// - Port range (top100=100, top1000=1000, all=65535, custom=parsed)
+/// - Scan type (ping < connect/syn < udp)
+/// - Timing template (0-5, faster = less time per port)
+/// - Service detection (adds 2-10s per open port)
+///
+/// Formula:
+/// base = (hosts * ports * scan_multiplier) / (timing_speed * 1000)
+/// + (service_detection_overhead if enabled)
+///
+/// Returns timeout in seconds with reasonable min/max bounds.
+fn calculate_timeout(
+    target: &str,
+    ports: &str,
+    scan_type: &str,
+    timing: u64,
+    has_service_detection: bool,
+) -> u64 {
+    // Estimate number of target hosts
+    let host_count = estimate_host_count(target);
+
+    // Estimate number of ports
+    let port_count = match ports {
+        "top100" => 100,
+        "top1000" => 1000,
+        "all" => 65535,
+        _ => {
+            // Parse custom port spec (e.g., "80,443", "1-1000", "80-443,8000-9000")
+            parse_port_count(ports)
+        }
+    };
+
+    // Scan type multiplier (relative speed)
+    let scan_multiplier = match scan_type {
+        "ping" => return 60, // Ping scans are always fast
+        "syn" => 1.0,        // SYN is fastest port scan
+        "connect" => 1.2,    // TCP connect slightly slower
+        "udp" => 3.0,        // UDP much slower (no response = wait for timeout)
+        _ => 1.2,
+    };
+
+    // Timing template speed factor (packets per second)
+    // T0=0.01pps, T1=1pps, T2=10pps, T3=100pps, T4=1000pps, T5=5000pps (approximate)
+    let timing_speed = match timing {
+        0 => 0.01,   // Paranoid
+        1 => 1.0,    // Sneaky
+        2 => 10.0,   // Polite
+        3 => 100.0,  // Normal (default)
+        4 => 1000.0, // Aggressive
+        5 => 5000.0, // Insane
+        _ => 100.0,
+    };
+
+    // Base calculation: (hosts * ports * scan_multiplier) / timing_speed
+    // This gives us seconds to scan all ports
+    let base_seconds =
+        (host_count as f64 * port_count as f64 * scan_multiplier / timing_speed) as u64;
+
+    // Service detection overhead: ~5s per open port * estimated open ports
+    // Assume ~5% of ports are open for external scans
+    let service_overhead = if has_service_detection {
+        let estimated_open_ports = (host_count * port_count / 20).max(1); // ~5% open
+        (estimated_open_ports * 5) as u64 // 5 seconds per service probe
+    } else {
+        0
+    };
+
+    // Add 20% buffer for network latency, packet loss, retries
+    let buffered = base_seconds + service_overhead;
+    let with_buffer = (buffered as f64 * 1.2) as u64;
+
+    // Enforce reasonable bounds
+    let min_timeout = 60; // At least 1 minute
+    let max_timeout = 7200; // At most 2 hours
+
+    with_buffer.clamp(min_timeout, max_timeout)
+}
+
+/// Estimate the number of target hosts from target specification
+fn estimate_host_count(target: &str) -> usize {
+    // Check for CIDR notation (e.g., "192.168.1.0/24")
+    if let Some(cidr_pos) = target.find('/') {
+        if let Ok(prefix_len) = target[cidr_pos + 1..].parse::<u32>() {
+            // Calculate hosts from CIDR prefix length
+            // /24 = 256 hosts, /16 = 65536 hosts, etc.
+            let host_bits = 32 - prefix_len;
+            return (2_u32.pow(host_bits) as usize).min(65536); // Cap at /16
+        }
+    }
+
+    // Check for space-separated or comma-separated IPs
+    let separators = [' ', ','];
+    for sep in separators {
+        let parts: Vec<&str> = target.split(sep).filter(|s| !s.is_empty()).collect();
+        if parts.len() > 1 {
+            return parts.len();
+        }
+    }
+
+    // Single host or hostname
+    1
+}
+
+/// Parse port count from custom port specification
+fn parse_port_count(ports: &str) -> usize {
+    let mut total = 0;
+
+    // Split by comma for multiple ranges (e.g., "80,443,8000-9000")
+    for part in ports.split(',') {
+        let part = part.trim();
+        if part.contains('-') {
+            // Range (e.g., "1-1000")
+            let range_parts: Vec<&str> = part.split('-').collect();
+            if range_parts.len() == 2 {
+                if let (Ok(start), Ok(end)) = (
+                    range_parts[0].parse::<usize>(),
+                    range_parts[1].parse::<usize>(),
+                ) {
+                    total += (end - start + 1).min(65535);
+                }
+            }
+        } else {
+            // Single port
+            if part.parse::<u16>().is_ok() {
+                total += 1;
+            }
+        }
+    }
+
+    total.max(1) // At least 1 port
 }
