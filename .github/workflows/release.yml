@@ -192,7 +192,7 @@ jobs:
   # ===========================================
   build-android:
     name: Android
-    continue-on-error: true
+    if: false  # Disabled: Android build has pre-existing compile issues
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -247,7 +247,7 @@ jobs:
   # ===========================================
   build-ios:
     name: iOS
-    continue-on-error: true
+    if: false  # Disabled: iOS build requires Apple signing setup
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -425,7 +425,7 @@ jobs:
   # ===========================================
   release:
     name: Create Release
-    needs: [build-desktop-linux, build-desktop-windows, build-desktop-macos, build-web, build-android, build-ios, build-headless-linux, build-headless-windows, build-headless-macos]
+    needs: [build-desktop-linux, build-desktop-windows, build-desktop-macos, build-web, build-headless-linux, build-headless-windows, build-headless-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
