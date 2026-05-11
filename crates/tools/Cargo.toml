@@ -21,6 +21,8 @@ pentest-cyberchef = { path = "../cyberchef" }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
+tokio-native-tls = "0.3"
+native-tls = "0.2"
 
 # Serialization
 serde = { workspace = true }

@@ -11,6 +11,8 @@ use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::{timeout, Duration};
+use tokio_native_tls::native_tls;
+use tokio_native_tls::TlsConnector;
 
 use crate::util::{param_str, param_u64};
 
@@ -25,10 +27,13 @@ impl ServiceBannerTool {
             22 => "",                                      // SSH - sends banner first
             23 => "",                                      // Telnet
             25 | 587 => "EHLO banner.local\r\n",           // SMTP
+            465 => "EHLO banner.local\r\n",                // SMTPS (uses TLS)
             80 | 8080 | 8000 => "HEAD / HTTP/1.0\r\n\r\n", // HTTP
             110 => "QUIT\r\n",                             // POP3
             143 => "A001 LOGOUT\r\n",                      // IMAP
-            443 | 8443 => "GET / HTTP/1.0\r\n\r\n",        // HTTPS (won't work without TLS)
+            993 => "A001 LOGOUT\r\n",                      // IMAPS (uses TLS)
+            995 => "QUIT\r\n",                             // POP3S (uses TLS)
+            443 | 8443 => "GET / HTTP/1.0\r\n\r\n",        // HTTPS (uses TLS)
             3306 => "",                                    // MySQL
             5432 => "",                                    // PostgreSQL
             _ => "GET / HTTP/1.0\r\n\r\n",                 // Default HTTP probe
@@ -160,47 +165,92 @@ impl PentestTool for ServiceBannerTool {
 
             // Connect to target
             let addr = format!("{}:{}", host, port);
-            let stream = timeout(Duration::from_millis(timeout_ms), TcpStream::connect(&addr))
+            let tcp_stream = timeout(Duration::from_millis(timeout_ms), TcpStream::connect(&addr))
                 .await
                 .map_err(|_| Error::Timeout(format!("Connection to {} timed out", addr)))?
                 .map_err(|e| Error::Network(format!("Failed to connect to {}: {}", addr, e)))?;
 
-            let (mut read_half, mut write_half) = stream.into_split();
+            // Determine if TLS is needed based on port
+            let needs_tls = matches!(port, 443 | 8443 | 465 | 993 | 995);
 
-            // Send probe if needed
-            let probe = Self::get_probe(port);
-            if !probe.is_empty() {
-                write_half
-                    .write_all(probe.as_bytes())
+            let banner = if needs_tls {
+                // TLS connection for HTTPS and other encrypted services
+                let connector = native_tls::TlsConnector::builder()
+                    .danger_accept_invalid_certs(true) // Accept self-signed certs for pentesting
+                    .build()
+                    .map_err(|e| {
+                        Error::Network(format!("Failed to create TLS connector: {}", e))
+                    })?;
+
+                let connector = TlsConnector::from(connector);
+                let mut tls_stream = connector
+                    .connect(&host, tcp_stream)
                     .await
-                    .map_err(|e| Error::Network(format!("Failed to send probe: {}", e)))?;
-            }
+                    .map_err(|e| Error::Network(format!("TLS handshake failed: {}", e)))?;
 
-            // Read banner (max 4KB)
-            let mut buffer = vec![0u8; 4096];
-            let bytes_read = timeout(
-                Duration::from_millis(timeout_ms),
-                read_half.read(&mut buffer),
-            )
-            .await
-            .map_err(|_| Error::Timeout("Banner read timed out".into()))?
-            .map_err(|e| Error::Network(format!("Failed to read banner: {}", e)))?;
+                // Send probe
+                let probe = Self::get_probe(port);
+                if !probe.is_empty() {
+                    timeout(
+                        Duration::from_millis(timeout_ms),
+                        tls_stream.write_all(probe.as_bytes()),
+                    )
+                    .await
+                    .map_err(|_| Error::Timeout("TLS write timed out".into()))?
+                    .map_err(|e| Error::Network(format!("Failed to send TLS probe: {}", e)))?;
+                }
 
-            let banner = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
+                // Read banner
+                let mut buffer = vec![0u8; 4096];
+                let bytes_read = timeout(
+                    Duration::from_millis(timeout_ms),
+                    tls_stream.read(&mut buffer),
+                )
+                .await
+                .map_err(|_| Error::Timeout("TLS banner read timed out".into()))?
+                .map_err(|e| Error::Network(format!("Failed to read TLS banner: {}", e)))?;
+
+                String::from_utf8_lossy(&buffer[..bytes_read]).to_string()
+            } else {
+                // Plain TCP connection
+                let (mut read_half, mut write_half) = tcp_stream.into_split();
+
+                // Send probe if needed
+                let probe = Self::get_probe(port);
+                if !probe.is_empty() {
+                    write_half
+                        .write_all(probe.as_bytes())
+                        .await
+                        .map_err(|e| Error::Network(format!("Failed to send probe: {}", e)))?;
+                }
+
+                // Read banner (max 4KB)
+                let mut buffer = vec![0u8; 4096];
+                let bytes_read = timeout(
+                    Duration::from_millis(timeout_ms),
+                    read_half.read(&mut buffer),
+                )
+                .await
+                .map_err(|_| Error::Timeout("Banner read timed out".into()))?
+                .map_err(|e| Error::Network(format!("Failed to read banner: {}", e)))?;
+
+                String::from_utf8_lossy(&buffer[..bytes_read]).to_string()
+            };
 
             // Parse banner
             let (service, version) = Self::parse_banner(&banner, port);
 
-            // Provenance: the reproducible analogue of our raw TCP probe is
-            // an ncat command piping the same bytes into the socket. This
-            // lets a reviewer re-grab the banner with a standard tool.
+            // Provenance: the reproducible analogue of our probe is an ncat command
+            // piping the same bytes into the socket. For TLS connections, add --ssl.
+            let probe = Self::get_probe(port);
+            let tls_flag = if needs_tls { " --ssl" } else { "" };
             let reproducible = if probe.is_empty() {
-                format!("ncat {host} {port}")
+                format!("ncat{} {} {}", tls_flag, host, port)
             } else {
                 // Render escape sequences visibly (\r\n etc.) so the
                 // published command is legible and executable as-is.
                 let escaped = probe.replace('\r', "\\r").replace('\n', "\\n");
-                format!("printf '{escaped}' | ncat {host} {port}")
+                format!("printf '{}' | ncat{} {} {}", escaped, tls_flag, host, port)
             };
             let provenance = Provenance::new(
                 "tcp-banner",
