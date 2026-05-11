@@ -433,8 +433,8 @@ impl LiveViewConnector {
                                     active_specialists: std::collections::HashMap::new(),
                                 };
 
-                                // Already in async context, use .write().await directly
-                                let mut scan_guard = self.active_scan.write().await;
+                                // Non-async context - use blocking write lock
+                                let mut scan_guard = self.active_scan.blocking_write();
                                 *scan_guard = Some(scan_state.clone());
                                 tracing::info!(
                                     "Scan state initialized: conversation={} agent={}",
@@ -495,11 +495,12 @@ impl LiveViewConnector {
                                         spawned_at: std::time::SystemTime::now(),
                                     };
 
-                                    // Already in async context, use .write().await directly
-                                    let mut scan_guard = self.active_scan.write().await;
+                                    // Non-async context - use blocking write lock
+                                    let mut scan_guard = self.active_scan.blocking_write();
                                     if let Some(ref mut scan) = *scan_guard {
                                         // Check specialist limit before adding
-                                        if scan.active_specialists.len() >= MAX_SPECIALISTS_PER_SCAN {
+                                        if scan.active_specialists.len() >= MAX_SPECIALISTS_PER_SCAN
+                                        {
                                             tracing::warn!(
                                                 "Max specialists limit reached ({}). \
                                                  Specialist {} will not be tracked.",
