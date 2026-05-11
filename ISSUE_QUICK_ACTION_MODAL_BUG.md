@@ -6,8 +6,8 @@ When clicking Quick Actions (AutoPwn, etc.) in the dashboard, the parameter moda
 ## Environment
 - **Version:** feature/autopwn-quick-wins branch (commit 91990a2)
 - **Mode:** Headless (`./run-pentest.sh headless dev`)
-- **Server:** wss://jt-demo-01.strike48.engineering
-- **Tenant:** non-prod
+- **Server:** wss://disco-ball-us.strike48.com
+- **Tenant:** use-prd-c-disco-ball
 - **Browser:** Brave (Chromium-based)
 
 ## Steps to Reproduce

@@ -60,10 +60,10 @@ just run-headless-dev
 
 ### Before (Complex):
 ```bash
-STRIKE48_HOST="wss://jt-demo-01.strike48.engineering" \
-STRIKE48_TENANT=non-prod \
-MATRIX_API_URL=https://jt-demo-01.strike48.engineering \
-MATRIX_TENANT_ID=non-prod \
+STRIKE48_HOST="wss://disco-ball-us.strike48.com" \
+STRIKE48_TENANT=use-prd-c-disco-ball \
+MATRIX_API_URL=https://disco-ball-us.strike48.com \
+MATRIX_TENANT_ID=use-prd-c-disco-ball \
 RUST_LOG=debug \
 just run-headless | tee -a ~/tmp/pentest.log
 ```
@@ -111,10 +111,10 @@ Edit `.env` to customize:
 
 ```bash
 # Your Strike48 configuration
-STRIKE48_HOST=wss://jt-demo-01.strike48.engineering
-STRIKE48_TENANT=non-prod
-MATRIX_API_URL=https://jt-demo-01.strike48.engineering
-MATRIX_TENANT_ID=non-prod
+STRIKE48_HOST=wss://disco-ball-us.strike48.com
+STRIKE48_TENANT=use-prd-c-disco-ball
+MATRIX_API_URL=https://disco-ball-us.strike48.com
+MATRIX_TENANT_ID=use-prd-c-disco-ball
 
 # Logging
 RUST_LOG=debug
@@ -134,10 +134,10 @@ If you want full control, you can still use the long form:
 ```bash
 # With sudo (required for WiFi)
 sudo -E env \
-    STRIKE48_HOST="wss://jt-demo-01.strike48.engineering" \
-    STRIKE48_TENANT=non-prod \
-    MATRIX_API_URL=https://jt-demo-01.strike48.engineering \
-    MATRIX_TENANT_ID=non-prod \
+    STRIKE48_HOST="wss://disco-ball-us.strike48.com" \
+    STRIKE48_TENANT=use-prd-c-disco-ball \
+    MATRIX_API_URL=https://disco-ball-us.strike48.com \
+    MATRIX_TENANT_ID=use-prd-c-disco-ball \
     RUST_LOG=debug \
     cargo run --package pentest-headless 2>&1 | tee -a ~/tmp/pentest.log
 ```
