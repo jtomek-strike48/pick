@@ -191,6 +191,51 @@ pub fn ChatPanel(props: ChatPanelProps) -> Element {
     }
 
     // -----------------------------------------------------------------------
+    // Lazy browser-OAuth: trigger on first Chat panel visit when token is missing
+    // -----------------------------------------------------------------------
+
+    // Track whether we've attempted browser auth
+    let mut browser_auth_attempted = use_signal(|| false);
+
+    // If Chat panel is visible, we don't have a token, and we haven't tried browser auth yet
+    if props.visible
+        && effective_token.is_empty()
+        && !api_url.is_empty()
+        && !browser_auth_attempted()
+        && !agents_loaded()
+    {
+        browser_auth_attempted.set(true);
+        let api_url_clone = api_url.clone();
+
+        crate::liveview_server::push_terminal_line(TerminalLine::info(
+            "[chat] No auth token — opening browser for authentication...",
+        ));
+
+        spawn(async move {
+            match pentest_core::matrix::fetch_matrix_token_browser(&api_url_clone).await {
+                Ok(token) => {
+                    tracing::info!(
+                        "[chat] Browser auth succeeded, token length: {}",
+                        token.len()
+                    );
+                    crate::liveview_server::set_matrix_credentials(&api_url_clone, &token);
+                    crate::session::set_auth_token(&token);
+                    crate::liveview_server::push_terminal_line(TerminalLine::success(
+                        "[chat] Authentication successful — chat ready",
+                    ));
+                }
+                Err(e) => {
+                    tracing::warn!("[chat] Browser auth failed: {}", e);
+                    crate::liveview_server::push_terminal_line(TerminalLine::error(format!(
+                        "[chat] Authentication failed: {}",
+                        e
+                    )));
+                }
+            }
+        });
+    }
+
+    // -----------------------------------------------------------------------
     // Fetch agents when we have a token
     // -----------------------------------------------------------------------
 
