@@ -814,11 +814,39 @@ impl LiveViewConnector {
             // Get fresh JWT if we have an OTT provider (matches kubestudio pattern:
             // fetch a token at the start of each iteration so reconnects always use
             // a valid token instead of a potentially expired cached one).
+            //
+            // On startup (connection_failures == 0), use a short 5s timeout to fail
+            // fast on unreachable auth URLs. On subsequent reconnects, allow the SDK's
+            // full retry budget (3x30s) since the credentials are known-good.
             {
                 let mut ott_guard = self.ott_provider.write().await;
                 if let Some(ref mut ott) = *ott_guard {
-                    match ott.get_token().await {
-                        Ok(token) => {
+                    // On first connection attempt, use a short 5s timeout to detect stale
+                    // credentials pointing at unreachable auth URLs. On subsequent reconnects,
+                    // allow the SDK's full retry budget since credentials are known-good.
+                    let token_result = if connection_failures == 0 {
+                        match tokio::time::timeout(
+                            tokio::time::Duration::from_secs(5),
+                            ott.get_token(),
+                        )
+                        .await
+                        {
+                            Ok(result) => Some(result),
+                            Err(_elapsed) => {
+                                tracing::warn!(
+                                    "Token refresh timed out after 5s (likely stale credentials pointing \
+                                     at unreachable auth URL). Will clean up stale credentials and fall \
+                                     through to OTT-approval flow."
+                                );
+                                None
+                            }
+                        }
+                    } else {
+                        Some(ott.get_token().await)
+                    };
+
+                    match token_result {
+                        Some(Ok(token)) => {
                             tracing::info!("Got fresh JWT via OttProvider (len={})", token.len());
                             self.config.auth_token = token.clone();
                             self.send_event(ConnectorEvent::CredentialsUpdated {
@@ -826,10 +854,26 @@ impl LiveViewConnector {
                                 api_url: self.derive_matrix_api_url(),
                             });
                         }
-                        Err(e) => {
+                        Some(Err(e)) => {
                             tracing::warn!("Failed to get JWT from saved credentials: {}", e);
                             self.config.auth_token.clear();
                             // Clean up stale credentials file
+                            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                            let stale = format!(
+                                "{}/.strike48/credentials/pentest-connector_{}.json",
+                                home, self.config.instance_id
+                            );
+                            if std::fs::remove_file(&stale).is_ok() {
+                                tracing::info!("Removed stale credentials file: {}", stale);
+                            }
+                            *ott_guard = None;
+                        }
+                        None => {
+                            // Timeout on first connection - clean up stale credentials
+                            tracing::warn!(
+                                "Token refresh timed out - cleaning up stale credentials"
+                            );
+                            self.config.auth_token.clear();
                             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
                             let stale = format!(
                                 "{}/.strike48/credentials/pentest-connector_{}.json",
