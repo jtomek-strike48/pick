@@ -323,15 +323,18 @@ pub async fn fetch_matrix_token_browser(matrix_url: &str) -> crate::error::Resul
                     l
                 }
                 Err(_) => {
-                    tracing::warn!("[BROWSER_AUTH] Ports 4000 and 5173 busy, using random port (CORS may fail)");
-                    tokio::net::TcpListener::bind("127.0.0.1:0")
-                        .await
-                        .map_err(|e| {
-                            crate::error::Error::Matrix(format!(
-                                "Failed to bind callback server: {}",
-                                e
-                            ))
-                        })?
+                    // Ports 4000 and 5173 are required for CORS (Matrix server whitelist).
+                    // Using a random port would cause the callback to timeout due to CORS rejection.
+                    tracing::error!(
+                        "[BROWSER_AUTH] Ports 4000 and 5173 are busy. Browser OAuth requires one of these ports. \
+                         Stop the process using these ports (likely dev servers: `lsof -i :4000` and `lsof -i :5173`)."
+                    );
+                    return Err(crate::error::Error::Matrix(
+                        "matrix: Browser OAuth requires ports 4000 or 5173 to be available. \
+                         Both ports are currently in use. Stop any dev servers (Vite, Vue CLI, etc.) \
+                         or other processes using these ports and try again. \
+                         To check: `lsof -i :4000` and `lsof -i :5173`".to_string()
+                    ));
                 }
             }
         }
