@@ -83,8 +83,24 @@ pub(super) fn list_directory(
     let mut entries: Vec<FileEntry> = std::fs::read_dir(&target)
         .map_err(|e| format!("Cannot read directory: {}", e))?
         .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let meta = entry.metadata().ok()?;
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    tracing::warn!("Failed to read directory entry in {:?}: {}", target, e);
+                    return None;
+                }
+            };
+            let meta = match entry.metadata() {
+                Ok(m) => m,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to read metadata for {:?}: {} (likely permission denied)",
+                        entry.path(),
+                        e
+                    );
+                    return None;
+                }
+            };
             let name = entry.file_name().to_string_lossy().to_string();
 
             let entry_rel = if rel_path.is_empty() {
