@@ -88,7 +88,10 @@ pub fn default_pentest_agent_input(tenant_id: &str, connector_name: &str) -> Cre
                 "system:mermaid_guide": { "consent_mode": "auto", "enabled": true },
                 "system:validate_echarts": { "consent_mode": "auto", "enabled": true },
                 "system:validate_mermaid": { "consent_mode": "auto", "enabled": true },
-                "system:validate_react": { "consent_mode": "auto", "enabled": true }
+                "system:validate_react": { "consent_mode": "auto", "enabled": true },
+                "system:reactor_todoexecute": { "consent_mode": "auto", "enabled": true },
+                "system:reactor_todoread": { "consent_mode": "auto", "enabled": true },
+                "system:reactor_todowrite": { "consent_mode": "auto", "enabled": true }
             },
             "mcp_servers": {},
             "connectors": connectors,
@@ -636,7 +639,10 @@ pub fn default_report_agent_input(tenant_id: &str, connector_name: &str) -> Crea
                 "system:mermaid_guide": { "consent_mode": "auto", "enabled": true },
                 "system:validate_echarts": { "consent_mode": "auto", "enabled": true },
                 "system:validate_mermaid": { "consent_mode": "auto", "enabled": true },
-                "system:validate_react": { "consent_mode": "auto", "enabled": true }
+                "system:validate_react": { "consent_mode": "auto", "enabled": true },
+                "system:reactor_todoexecute": { "consent_mode": "auto", "enabled": true },
+                "system:reactor_todoread": { "consent_mode": "auto", "enabled": true },
+                "system:reactor_todowrite": { "consent_mode": "auto", "enabled": true }
             },
             "mcp_servers": {},
             "connectors": connectors,
